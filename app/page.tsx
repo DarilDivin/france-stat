@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-// import FranceMap from "@/components/FranceMap";
 import Background from "@/components/Background";
+// import FranceMap from "@/components/FranceMapTopoJson";
+// import FranceMap from "@/components/FranceMap";
 import FranceMap from "@/components/FranceMapTest";
+import FranceMapDepartement from "@/components/maps/FranceMapDepartement";
 // import FranceMap from "@/components/FranceMapClickZoom";
 
 export default function Home() {
@@ -11,6 +13,7 @@ export default function Home() {
 
   useEffect(() => {
     fetch("/data/france-departements-avec-outre-mer.geojson")
+    // fetch("/data/states-albers-10m.json")
       .then((res) => res.json())
       .then(setGeoData);
   }, []);
@@ -21,7 +24,7 @@ export default function Home() {
         <Background />
       </div>
       <div className="bg-background p-4 rounded-lg shadow-md flex justify-center items-center h-screen">
-      {geoData && <FranceMap geoData={geoData} width={1000} height={900} />}
+      {geoData && <FranceMapDepartement geoData={geoData} width={1000} height={900} />}
       </div>
     </div>
   );

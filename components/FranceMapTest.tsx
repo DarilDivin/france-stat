@@ -18,6 +18,8 @@ const FranceMap: React.FC<Props> = ({ geoData, width = 800, height = 934 }) => {
   const ref = useRef<SVGSVGElement>(null);
   const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null);
 
+  console.log("Objets disponibles:", geoData);
+
   useEffect(() => {
     if (!geoData || !ref.current) return;
     
@@ -40,7 +42,7 @@ const FranceMap: React.FC<Props> = ({ geoData, width = 800, height = 934 }) => {
     const projection = d3
       .geoConicConformal()
       .center([2.454071, 46.279229])
-      .scale(width * 3.6)
+      .scale(width * 5)
       .translate([width / 2, height / 2]);
 
     const path = d3.geoPath().projection(projection);
@@ -63,7 +65,9 @@ const FranceMap: React.FC<Props> = ({ geoData, width = 800, height = 934 }) => {
       .attr("class", "transition-all duration-200")
       .on("click", clicked)
       .on("mouseover", function (event: any, d: any) {
-        const { transform } = event;
+        // Récupérer le zoom courant depuis le SVG
+        const svgNode = ref.current;
+        const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
         const centroid = path.centroid(d);
 
         const svgRect = ref.current!.getBoundingClientRect();
@@ -81,17 +85,19 @@ const FranceMap: React.FC<Props> = ({ geoData, width = 800, height = 934 }) => {
 
         // CORRECTION: Ne modifie que le fill, garde les autres attributs intacts
         d3.select(this)
-          .attr("fill", "#f59e42")
+          .attr("stroke", "#f59e42")
           .attr("stroke-width", 1 / transform.k); // Garder l'épaisseur du trait constante
       })
       .on("mouseout", function (event : any) {
 
-        const { transform } = event;
+        // Récupérer le zoom courant depuis le SVG
+        const svgNode = ref.current;
+        const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
 
         setHoveredRegion(null);
         // CORRECTION: Réinitialise seulement le fill
         d3.select(this)
-          .attr("fill", "transparent")
+          .attr("stroke", "#e5e5e530")
           .attr("stroke-width", 1 / transform.k);
       });
 
