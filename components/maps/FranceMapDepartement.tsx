@@ -2,27 +2,37 @@ import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import Background from "../Background";
 
+import { motion } from "motion/react";
+import { usePopulation } from "@/hooks/usePopulationData";
+import { PopulationDepartement } from "@/types/population";
+
 type Props = {
   geoData: any;
+  setSelectedDepartment?: (department: any | null) => void;
+  populationData?: Record<string, PopulationDepartement>;
   width?: number;
   height?: number;
 };
 
 type RegionData = {
-  properties: any;
+  properties: PopulationDepartement | any;
   centroid: [number, number];
   screenPosition: { x: number; y: number };
 };
 
-const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 934 }) => {
+const FranceMapDepartement: React.FC<Props> = ({
+  geoData,
+  width = 800,
+  height = 934,
+}) => {
   const ref = useRef<SVGSVGElement>(null);
   const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null);
 
-  console.log("Objets disponibles:", geoData);
+  const { data, setSelectedDep } = usePopulation();
 
   useEffect(() => {
     if (!geoData || !ref.current) return;
-    
+
     // Nettoyer le SVG existant
     const svg = d3.select(ref.current);
     svg.selectAll("*").remove();
@@ -64,7 +74,7 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
       .attr("cursor", "pointer")
       .attr("class", "transition-all duration-200")
       .on("click", clicked)
-      .on("mouseover", function (event: any, d: any) {
+      .on("mouseover", function (_: any, d: any) {
         // Récupérer le zoom courant depuis le SVG
         const svgNode = ref.current;
         const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
@@ -74,8 +84,16 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
         const screenX = svgRect.left + centroid[0];
         const screenY = svgRect.top + centroid[1] + window.scrollY;
 
+        // Transforme le code en nombre si possible (ex: "03" -> 3)
+        const code =
+          d.properties.code && !isNaN(Number(d.properties.code))
+            ? String(Number(d.properties.code))
+            : d.properties.code;
+        // Mettre à jour l'état de la région survolée
         setHoveredRegion({
-          properties: d.properties,
+          properties: data?.filter(
+            (dep: PopulationDepartement) => dep.id === code
+          )[0],
           centroid: centroid,
           screenPosition: {
             x: screenX,
@@ -88,8 +106,7 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
           .attr("stroke", "#f59e42")
           .attr("stroke-width", 1 / transform.k); // Garder l'épaisseur du trait constante
       })
-      .on("mouseout", function (event : any) {
-
+      .on("mouseout", function () {
         // Récupérer le zoom courant depuis le SVG
         const svgNode = ref.current;
         const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
@@ -109,12 +126,12 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
     // CORRECTION: Améliorer le dessin des frontières
     // Méthode 1: Dessiner les frontières comme des lignes distinctes
     const boundaries = generateBoundaries(geoData.features);
-    
+
     g.append("g")
       .selectAll("path")
       .data(boundaries)
       .join("path")
-      .attr("d", d => path(d))
+      .attr("d", (d) => path(d))
       .attr("fill", "none")
       .attr("stroke", "#ffffffcc")
       .attr("stroke-width", 1)
@@ -127,6 +144,7 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
     // Fonction pour réinitialiser le zoom
     function reset() {
       regions.transition().attr("fill", "transparent");
+      setSelectedDep && setSelectedDep(null);
       svg
         .transition()
         .duration(750)
@@ -145,6 +163,13 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
       // Réinitialiser toutes les couleurs puis colorer la région sélectionnée
       regions.transition().attr("fill", "transparent");
       d3.select(event.currentTarget).transition().attr("fill", "#00ff00");
+      if (setSelectedDep) {
+        setSelectedDep(
+          data?.filter(
+            (dep: PopulationDepartement) => dep.id === d.properties.code
+          )[0] || null
+        );
+      }
 
       // Zoomer sur la région
       svg
@@ -167,7 +192,9 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
       const { transform } = event;
       g.attr("transform", transform);
       // CORRECTION: Ajuste uniquement l'épaisseur des traits des frontières, pas des régions
-      g.select("g:last-child").selectAll("path").attr("stroke-width", 1 / transform.k);
+      g.select("g:last-child")
+        .selectAll("path")
+        .attr("stroke-width", 1 / transform.k);
       g.selectAll("path").attr("stroke-width", 1 / transform.k);
     }
 
@@ -175,11 +202,14 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
     function generateBoundaries(features: any[]) {
       const boundaries: any[] = [];
       const seen = new Set();
-      
+
       // Pour chaque paire de régions adjacentes, crée une frontière unique
       for (let i = 0; i < features.length; i++) {
         for (let j = i + 1; j < features.length; j++) {
-          const boundary = findCommonBoundary(features[i].geometry, features[j].geometry);
+          const boundary = findCommonBoundary(
+            features[i].geometry,
+            features[j].geometry
+          );
           if (boundary) {
             const key = JSON.stringify(boundary.coordinates);
             if (!seen.has(key)) {
@@ -189,21 +219,21 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
           }
         }
       }
-      
+
       return boundaries;
     }
 
     // Fonction pour trouver la frontière commune entre deux géométries
-    function findCommonBoundary(geom1: any, geom2: any) {
+    function findCommonBoundary(geom1: any, _geom2: any) {
       // Implémentation simplifiée: convertit les LineString en coordonnées
       // Dans une vraie implémentation, tu devrais comparer les segments de frontière
       // et ne garder que ceux qui sont partagés
-      
+
       // Pour la démonstration, on retourne simplement un LineString pour chaque région
       // Cette partie doit être adaptée selon la structure de tes données
       return {
         type: "LineString",
-        coordinates: geom1.coordinates[0].slice(0, 10) // Exemple simplifié
+        coordinates: geom1.coordinates[0].slice(0, 10), // Exemple simplifié
       };
     }
   }, [geoData, width, height]);
@@ -220,20 +250,27 @@ const FranceMapDepartement: React.FC<Props> = ({ geoData, width = 800, height = 
         />
 
         {hoveredRegion && (
-          <div
-            className="fixed bg-blue-900 text-white px-4 py-2 rounded-lg shadow-lg z-50 transform -translate-y-full -mt-2 pointer-events-none"
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="fixed bg-zinc-600 text-white p-1 rounded-sm shadow-lg z-50 transform pointer-events-none"
             style={{
               left: hoveredRegion.screenPosition.x + 30,
               top: hoveredRegion.screenPosition.y - 40,
             }}
           >
             <div className="font-bold">
-              {hoveredRegion.properties.nom || hoveredRegion.properties.name}
+              {hoveredRegion.properties?.nom || hoveredRegion.properties?.name}
             </div>
             <div className="text-sm">
-              ID: {hoveredRegion.properties.code || hoveredRegion.properties.id}
+              {hoveredRegion.properties?.code || hoveredRegion.properties?.id}
             </div>
-          </div>
+            <div className="text-sm">
+              {hoveredRegion.properties?.ensemble?.total}
+            </div>
+          </motion.div>
         )}
       </div>
     </div>
