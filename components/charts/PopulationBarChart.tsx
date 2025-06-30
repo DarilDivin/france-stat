@@ -93,11 +93,13 @@ export default function PopulationBarChart({ department }: Props) {
         gradient
           .append("stop")
           .attr("offset", "0%")
-          .attr("stop-color", d3.color(g.color)!.brighter(0.7).formatHex());
+          .attr("stop-color", d3.color(g.color)!.brighter(0.7).formatHex())
+        //   .attr("stop-opacity", 0.8);   // <-- transparence ici
         gradient
           .append("stop")
           .attr("offset", "100%")
-          .attr("stop-color", d3.color(g.color)!.darker(1.2).formatHex());
+          .attr("stop-color", d3.color(g.color)!.darker(1.2).formatHex())
+        //   .attr("stop-opacity", 0.8);   // <-- transparence ici
       }
     });
 

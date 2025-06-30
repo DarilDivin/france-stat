@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LucideChevronsRightLeft } from "lucide-react";
 
 type Props = {
   geoData: any;
@@ -302,7 +303,7 @@ const FranceMapDepartement: React.FC<Props> = ({
       </div>
       <div className="relative w-full">
         <button
-          className="absolute top-2 right-2 z-50 bg-white/80 text-gray-800 px-3 py-1 rounded shadow hover:bg-white transition cursor-pointer"
+          className="absolute top-2 right-2 z-50 bg-white/20 text-white p-1 rounded-full shadow hover:bg-white hover:text-gray-800 transition cursor-pointer"
           onClick={() => {
             if (ref.current && zoomRef.current) {
               d3.select(ref.current)
@@ -313,7 +314,7 @@ const FranceMapDepartement: React.FC<Props> = ({
             }
           }}
         >
-          Réinitialiser la vue
+          <LucideChevronsRightLeft className="rotate-45" />
         </button>
         <svg
           ref={ref}
