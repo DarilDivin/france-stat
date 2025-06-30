@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as d3 from "d3";
+import gsap from "gsap";
 import Background from "../Background";
 import { motion } from "motion/react";
 import { usePopulation } from "@/hooks/usePopulationData";
@@ -42,6 +43,7 @@ const FranceMapDepartement: React.FC<Props> = ({
   const ref = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<Element, unknown> | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null);
   const [svgReady, setSvgReady] = useState(false);
 
@@ -115,7 +117,8 @@ const FranceMapDepartement: React.FC<Props> = ({
         });
         d3.select(this)
           .attr("stroke", "#f59e42")
-          .attr("stroke-width", 1 / transform.k);
+          .attr("stroke-width", 1 / transform.k)
+          .raise();
       })
       .on("mouseout", function () {
         const svgNode = ref.current;
@@ -133,8 +136,7 @@ const FranceMapDepartement: React.FC<Props> = ({
     // Générer les frontières
     const boundaries = generateBoundaries(geoData.features);
 
-    g
-      .selectAll("path.boundary")
+    g.selectAll("path.boundary")
       .data(boundaries)
       .join("path")
       .attr("class", "boundary")
@@ -151,10 +153,7 @@ const FranceMapDepartement: React.FC<Props> = ({
       svg
         .transition()
         .duration(750)
-        .call(
-          (zoomRef.current as any).transform,
-          d3.zoomIdentity
-        );
+        .call((zoomRef.current as any).transform, d3.zoomIdentity);
     }
 
     function clicked(event: any, d: any) {
@@ -241,7 +240,13 @@ const FranceMapDepartement: React.FC<Props> = ({
 
     if (!node) return;
 
-    d3.select(node).transition().attr("fill", "#00ff00");
+    // d3.select(node).transition().attr("fill", "#00ff00");
+    // Animation GSAP sur le fill
+    gsap.to(node, {
+      duration: 0.5,
+      attr: { fill: "#00ff00" },
+      ease: "power2.out",
+    });
 
     const svgWidth = Number(svg.attr("width")) || 800;
     const svgHeight = Number(svg.attr("height")) || 934;
@@ -272,7 +277,23 @@ const FranceMapDepartement: React.FC<Props> = ({
       );
   }, [selectedDep, geoData, svgReady]);
 
-  if (!data) return <div>Chargement des données…</div>;
+  useLayoutEffect(() => {
+    if (hoveredRegion && tooltipRef.current) {
+      gsap.fromTo(
+        tooltipRef.current,
+        { scale: 0.8, y: 20 },
+        { scale: 1, y: 0, duration: 0.5, ease: "power2.out" }
+      );
+    }
+  }, [hoveredRegion]);
+
+  if (!data)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <span className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mr-2"></span>
+        <span>Chargement des données…</span>
+      </div>
+    );
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -280,6 +301,20 @@ const FranceMapDepartement: React.FC<Props> = ({
         <Background />
       </div>
       <div className="relative w-full">
+        <button
+          className="absolute top-2 right-2 z-50 bg-white/80 text-gray-800 px-3 py-1 rounded shadow hover:bg-white transition cursor-pointer"
+          onClick={() => {
+            if (ref.current && zoomRef.current) {
+              d3.select(ref.current)
+                .transition()
+                .duration(750)
+                .call((zoomRef.current as any).transform, d3.zoomIdentity);
+              setSelectedDep(null);
+            }
+          }}
+        >
+          Réinitialiser la vue
+        </button>
         <svg
           ref={ref}
           className="w-full h-auto shadow-xl rounded-xl border border-gray-200/10 bg-gray-300/10"
@@ -289,6 +324,7 @@ const FranceMapDepartement: React.FC<Props> = ({
 
         {hoveredRegion && (
           <motion.div
+            ref={tooltipRef}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}

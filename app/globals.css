@@ -133,3 +133,8 @@
   stroke: #222 !important;
   stroke-width: 2;
 }
+
+.x-axis {
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
