@@ -297,13 +297,26 @@ const FranceMapDepartement: React.FC<Props> = ({
     );
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
-      <div className="opacity-10">
+    <div className="w-full mx-auto">
+      {/* <div className="opacity-10">
         <Background />
-      </div>
-      <div className="relative w-full">
+      </div> */}
+      <motion.div
+        ref={tooltipRef}
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="relative bg-zinc-600/00 text-white p-1 rounded-xl z-50 min-w-[250px]"
+        style={{
+          WebkitMaskImage:
+            "radial-gradient(circle at 50% 50%, #000 80%, transparent 100%)",
+          maskImage:
+            "radial-gradient(circle at 50% 50%, #000 80%, transparent 100%)",
+        }}
+      >
         <button
-          className="absolute top-2 right-2 z-50 bg-white/20 text-white p-1 rounded-full shadow hover:bg-white hover:text-gray-800 transition cursor-pointer"
+          className="absolute top-4 right-4 z-50 bg-white text-black p-1 rounded-full shadow hover:bg-white hover:text-gray-800 transition cursor-pointer"
           onClick={() => {
             if (ref.current && zoomRef.current) {
               d3.select(ref.current)
@@ -318,7 +331,8 @@ const FranceMapDepartement: React.FC<Props> = ({
         </button>
         <svg
           ref={ref}
-          className="w-full h-auto shadow-xl rounded-xl border border-gray-200/10 bg-gray-300/10"
+          className="w-full h-auto"
+          //shadow-xl rounded-xl border border-gray-200/10 bg-gray-300/10
         >
           <g ref={gRef} />
         </svg>
@@ -382,7 +396,7 @@ const FranceMapDepartement: React.FC<Props> = ({
             </Card>
           </motion.div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 };

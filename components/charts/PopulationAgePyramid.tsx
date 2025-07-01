@@ -26,12 +26,24 @@ function formatValue(val: number) {
 }
 
 export const legendData = [
-  { label: "Hommes", color: "#10b981" },
-  { label: "Femmes", color: "#f472b6" },
+  {
+    label: "Hommes",
+    baseColor1: "#3b82f6",
+    baseColor2: "#1e40af",
+    gradientId: "hommes-gradient",
+  },
+  {
+    label: "Femmes",
+    baseColor1: "#f472b6",
+    baseColor2: "#be185d",
+    gradientId: "femmes-gradient",
+  },
 ];
 
+// Utilitaire pour récupérer le fill url
 function getColor(label: string) {
-  return legendData.find((l) => l.label === label)?.color || "#888";
+  const item = legendData.find((l) => l.label === label);
+  return item ? `url(#${item.gradientId})` : "#888";
 }
 
 export default function PopulationAgePyramid({ department }: Props) {
@@ -60,6 +72,36 @@ export default function PopulationAgePyramid({ department }: Props) {
 
     const svg = d3.select(ref.current);
     // svg.selectAll("*").remove(); // Nettoyage du SVG à chaque render
+
+    // Ajoute ou sélectionne <defs>
+    let defs = svg.select<SVGDefsElement>("defs");
+    if (defs.empty()) {
+      defs = svg.append<SVGDefsElement>("defs");
+    }
+
+    // Génère dynamiquement les gradients à partir de legendData
+    legendData.forEach(({ gradientId, baseColor1, baseColor2 }) => {
+      let grad = defs.select<SVGLinearGradientElement>(`#${gradientId}`);
+      if (grad.empty()) {
+        grad = defs
+          .append<SVGLinearGradientElement>("linearGradient")
+          .attr("id", gradientId)
+          .attr("x1", "0%")
+          .attr("y1", "0%")
+          .attr("x2", "100%")
+          .attr("y2", "0%");
+        grad
+          .append("stop")
+          .attr("offset", "0%")
+          .attr("stop-color", baseColor1)
+          .attr("stop-opacity", 0.7);
+        grad
+          .append("stop")
+          .attr("offset", "100%")
+          .attr("stop-color", baseColor2)
+          .attr("stop-opacity", 1);
+      }
+    });
 
     // --- AXES ---
     const maxValue =
@@ -258,7 +300,6 @@ export default function PopulationAgePyramid({ department }: Props) {
       .attr("font-size", 12)
       .attr("font-weight", "bold");
 
-
     // Ajoute un div tooltip (hors SVG)
     let tooltip: d3.Selection<HTMLDivElement, unknown, HTMLElement, any> =
       d3.select<HTMLDivElement, unknown>("#pyramid-tooltip");
@@ -298,20 +339,28 @@ export default function PopulationAgePyramid({ department }: Props) {
   if (!department) return null;
 
   return (
-    <div className="bg-blue-900/00 rounded-lg shadow p-4 mb-4">
-      <h3 className="text-lg font-bold mb-2">Pyramide des âges</h3>
+    <div className="bg-blue-900/00 rounded-lg p-4 mb-4">
+      <p className="text-md text-left font-semibold mb-2">Pyramide des âges</p>
+      {/* <Gradients /> */}
       <div className="flex flex-col items-start">
         <div className="flex flex-col px-6">
           {legendData.map((item) => (
-            <div key={item.label} className="flex items-center gap-1">
-              <span
-                className="inline-block w-4 h-4 rounded-full"
-                style={{ background: item.color }}
-              ></span>
+            <div key={item.label} className="flex items-center gap-2">
+              <svg width={18} height={18} className="inline-block rounded-full">
+                <rect
+                  x={0}
+                  y={0}
+                  width={18}
+                  height={18}
+                  rx={9}
+                  fill={`url(#${item.gradientId})`}
+                />
+              </svg>
               <span className="text-sm text-white">{item.label}</span>
             </div>
           ))}
         </div>
+
         <svg ref={ref} width={500} height={220} />
       </div>
     </div>

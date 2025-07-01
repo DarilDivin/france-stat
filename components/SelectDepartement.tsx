@@ -70,7 +70,7 @@ export default function SelectDepartment({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[260px] justify-between mb-4"
+          className="w-[300px] justify-between rounded-3xl"
         >
           {selectedDep
             ? departments.find((d) => d.id === selectedDep.id)?.nom
@@ -78,7 +78,7 @@ export default function SelectDepartment({
           <ChevronsUpDown className="opacity-50 ml-2" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[260px] p-0">
+      <PopoverContent className="w-[300px] p-0">
         <Command>
           {/* <CommandInput
             placeholder="Rechercher un département…"

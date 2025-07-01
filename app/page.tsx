@@ -32,40 +32,41 @@ export default function Home() {
   const displayedDep = selectedDep ?? aggregateFrance(data);
 
   return (
-    <div className="bg-background min-h-screen text-foreground flex ">
-      <div className="opacity-10">
+    <div className="bg-gray-950 min-h-screen text-foreground p-2">
+      {/* <div className="opacity-10">
         <Background />
-      </div>
+      </div> */}
 
-      <div className="text-center p-4 z-50">
-        <h1 className="text-3xl font-bold mb-4">
-          Carte des Départements Français
-        </h1>
-        <p className="text-lg mb-2">
-          Sélectionnez un département pour voir les détails de la population.
-        </p>
+      <nav className="flex h-16 bg-accent/00 w-full rounded-md p-2 justify-between items-center z-50">
+        <h1 className="text-2xl font-bold">Population de France - 2023</h1>
+
         <SelectDepartment
           departments={data}
           selectedDep={selectedDep}
           setSelectedDep={setSelectedDep}
         />
-        <DepartmentStats department={displayedDep} />
-        <PopulationBarChart department={displayedDep} />
-        {/* <PopulationPieChart department={displayedDep} /> */}
-        <PopulationAgePyramid department={displayedDep}/>
-      </div>
+      </nav>
 
-      <div className="bg-background p-4 rounded-lg shadow-md flex justify-center items-center h-screen">
-        {geoData && (
-          <FranceMapDepartement
-            geoData={geoData}
-            width={1000}
-            height={900}
-            selectedDep={selectedDep}
-            setSelectedDep={setSelectedDep}
-          />
-        )}
-      </div>
+      <main className="w-full flex justify-between">
+        <div className="text-center p-4 z-50 bg-amber-700/00">
+          {/* <DepartmentStats department={displayedDep} /> */}
+          <PopulationBarChart department={displayedDep} />
+          <PopulationPieChart department={displayedDep} />
+          <PopulationAgePyramid department={displayedDep} />
+        </div>
+
+        <div className="bg-amber-950/00 p-4 rounded-lg flex justify-center items-center">
+          {geoData && (
+            <FranceMapDepartement
+              geoData={geoData}
+              width={1000}
+              height={900}
+              selectedDep={selectedDep}
+              setSelectedDep={setSelectedDep}
+            />
+          )}
+        </div>
+      </main>
     </div>
   );
 }

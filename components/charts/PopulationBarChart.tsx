@@ -315,9 +315,9 @@ export default function PopulationBarChart({ department }: Props) {
 
   return (
     <div id="my_dataviz" className="bg-transparent rounded-lg p-4 mb-4 ">
-      <h3 className="text-lg font-bold mb-2 text-left ml-[30]">
+      <p className="text-md font-semibold mb-2 text-left">
         Répartition par tranche d’âge
-      </h3>
+      </p>
       <svg ref={ref} width={500} height={200} />
 
       {tooltip?.visible && (
