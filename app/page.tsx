@@ -51,7 +51,7 @@ export default function Home() {
         />
         <DepartmentStats department={displayedDep} />
         <PopulationBarChart department={displayedDep} />
-        <PopulationPieChart department={displayedDep} />
+        {/* <PopulationPieChart department={displayedDep} /> */}
         <PopulationAgePyramid department={displayedDep}/>
       </div>
 
