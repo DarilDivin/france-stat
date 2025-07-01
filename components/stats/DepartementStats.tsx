@@ -10,11 +10,28 @@ export default function DepartmentStats({ department }: Props) {
   }
 
   return (
-    <div className="bg-background/80 rounded-lg shadow p-4 mb-4">
-      <h2 className="text-xl font-bold mb-2">{department.nom} ({department.id})</h2>
-      <div className="mb-1">Population totale : <span className="font-semibold">{department.ensemble.total?.toLocaleString() ?? "?"}</span></div>
-      <div className="mb-1">Hommes : <span className="font-semibold">{department.hommes.total?.toLocaleString() ?? "?"}</span></div>
-      <div className="mb-1">Femmes : <span className="font-semibold">{department.femmes.total?.toLocaleString() ?? "?"}</span></div>
+    <div className="bg-background/00 rounded-lg p-1 mb-4 w-[300px] flex flex-col justify-center items-start">
+      <h2 className="text-sm font-bold mb-2">
+        {department.nom} ({department.id})
+      </h2>
+      <div className="mb-1 flex flex-col items-start">
+        {/* <p className="text-xs text-foreground/60">Population totale :</p>{" "} */}
+        <span className="font-semibold text-3xl">
+          {department.ensemble.total?.toLocaleString() ?? "?"}
+        </span>
+      </div>
+      {/* <div className="mb-1 flex flex-col items-start">
+        <p className="text-xs text-foreground/60">Hommes :</p>{" "}
+        <span className="font-semibold text-2xl">
+          {department.hommes.total?.toLocaleString() ?? "?"}
+        </span>
+      </div>
+      <div className="mb-1 flex flex-col items-start">
+        <p className="text-xs text-foreground/60">Femmes :</p>{" "}
+        <span className="font-semibold text-2xl">
+          {department.femmes.total?.toLocaleString() ?? "?"}
+        </span>
+      </div> */}
       {/* Ajoute ici d'autres stats si besoin */}
     </div>
   );

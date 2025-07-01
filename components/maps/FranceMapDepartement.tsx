@@ -297,7 +297,7 @@ const FranceMapDepartement: React.FC<Props> = ({
     );
 
   return (
-    <div className="w-full mx-auto">
+    <div className="w-full mx-auto min-w-[300px] lg:min-w-[1008px]">
       {/* <div className="opacity-10">
         <Background />
       </div> */}

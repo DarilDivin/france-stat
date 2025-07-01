@@ -267,11 +267,11 @@ export default function PopulationPieChart({ department }: Props) {
   if (!department) return null;
 
   return (
-    <div className="bg-background/00 rounded-lg p-4 mb-4  w-full flex flex-col justify-center items-start">
-      <p className="text-md text-left font-semibold mb-2">Répartition Hommes / Femmes</p>
+    <div className="bg-background/00 rounded-lg p-4 mb-4 flex flex-col justify-center items-start">
+      {/* <p className="text-md text-left font-semibold mb-2">Répartition Hommes / Femmes</p> */}
       <svg
         ref={ref}
-        width={400}
+        width={300}
         height={220}
         viewBox={`0 0 ${width} ${height}`}
       />

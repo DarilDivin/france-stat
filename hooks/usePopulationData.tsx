@@ -29,7 +29,8 @@ export function PopulationContextProvider({
   const [selectedDep, setSelectedDep] = useState<PopulationDepartement | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/population")
+    // fetch("http://localhost:8000/api/population")
+    fetch("http://localhost:3000/api/population")
       .then((res) => res.json())
       .then(setData);
   }, []);
