@@ -58,3 +58,17 @@ public/data/estim-pop-dep-sexe-gca-1975-2023.xls
 # Exclure les fichiers de données de sauvegarde
 public/data/*bak*
 public/data/*backup*
+
+# Exclure les composants de développement
+components/*Old*
+components/*Test*
+components/FranceMapClickZoom.tsx
+components/FranceMapTest.tsx
+
+# Exclure les fichiers de build locaux
+.next/cache/
+.next/trace
+.next/trace.json
+
+# Exclure les node_modules des sous-dossiers
+**/node_modules/
