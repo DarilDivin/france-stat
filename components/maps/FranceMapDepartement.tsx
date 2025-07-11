@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
-import gsap from "gsap";
+import { gsap } from "@/lib/gsap";
 import Background from "../Background";
 import { motion } from "motion/react";
 import { usePopulation } from "@/hooks/usePopulationData";

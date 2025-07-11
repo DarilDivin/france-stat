@@ -1,0 +1,60 @@
+# Fichiers de développement
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dossiers de test et développement
+.next/cache
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Fichiers temporaires
+.DS_Store
+Thumbs.db
+
+# Fichiers de configuration de développement
+.env.local
+.env.development.local
+.env.test.local
+
+# Documentation et assets non critiques
+README.md
+docs/
+*.md
+
+# Fichiers de sauvegarde
+*.bak
+*.tmp
+
+# Anciennes versions de composants si elles existent
+*_old.*
+*_backup.*
+
+# Cache de package managers
+.pnpm
+node_modules/.cache
+.npm
+.yarn/cache
+
+# Fichiers de maps de source en production
+*.map
+
+# Tests
+__tests__/
+*.test.*
+*.spec.*
+coverage/
+
+# API locale de développement
+api/test.ipynb
+api/__pycache__/
+
+# Exclure les gros fichiers de données non critiques
+public/data/estim-pop-dep-sexe-gca-1975-2023.xls
+
+# Exclure les fichiers de données de sauvegarde
+public/data/*bak*
+public/data/*backup*

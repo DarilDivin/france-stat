@@ -12,10 +12,7 @@ import SelectDepartment from "@/components/SelectDepartement";
 import { Loader } from "@/components/ui/loader";
 import Footer from "@/components/Footer";
 import { Menu, X } from "lucide-react";
-import gsap from "gsap";
-import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
-import { TextPlugin } from "gsap/TextPlugin";
-gsap.registerPlugin(ScrambleTextPlugin, TextPlugin);
+import { gsap } from "@/lib/gsap";
 
 export default function Home() {
   const [geoData, setGeoData] = useState<any>(null);

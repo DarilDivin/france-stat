@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
-import gsap from "gsap";
+import { gsap } from "@/lib/gsap";
 import { PopulationDepartement } from "@/types/population";
 
 type Props = {
