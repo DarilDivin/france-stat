@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import gsap from "gsap";
 import Background from "../Background";
@@ -23,12 +23,6 @@ type Props = {
   setSelectedDep: (d: PopulationDepartement | null) => void;
 };
 
-type RegionData = {
-  properties: PopulationDepartement | any;
-  centroid: [number, number];
-  screenPosition: { x: number; y: number };
-};
-
 function normalizeCode(code: string | number) {
   if (typeof code === "string" && isNaN(Number(code))) return code.trim();
   return String(parseInt(code as string, 10));
@@ -44,11 +38,41 @@ const FranceMapDepartement: React.FC<Props> = ({
   const ref = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<Element, unknown> | null>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const [hoveredRegion, setHoveredRegion] = useState<RegionData | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [svgReady, setSvgReady] = useState(false);
+  const [responsiveMapPadding, setResponsiveMapPadding] = useState(40);
 
   const { data } = usePopulation();
+
+  // Dimensions calculées pour une carte responsive optimale
+  const aspectRatio = height / width; // ~1.1675 pour la France
+  const baseWidth = 1000; // Base standardisée
+  const baseHeight = Math.round(baseWidth * aspectRatio);
+
+  // Fonction pour calculer le padding responsive
+  const getResponsiveMapPadding = () => {
+    if (typeof window === "undefined") return 40; // SSR fallback
+    const width = window.innerWidth;
+    if (width < 640) return 20; // Mobile
+    if (width < 1024) return 30; // Tablet
+    return 40; // Desktop
+  };
+
+  // Effet pour gérer le redimensionnement
+  useEffect(() => {
+    const handleResize = () => {
+      setResponsiveMapPadding(getResponsiveMapPadding());
+    };
+
+    // Initialiser le padding
+    setResponsiveMapPadding(getResponsiveMapPadding());
+
+    // Ajouter le listener de redimensionnement
+    window.addEventListener("resize", handleResize);
+
+    // Nettoyer le listener
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     setSvgReady(false);
@@ -58,12 +82,40 @@ const FranceMapDepartement: React.FC<Props> = ({
     const g = d3.select(gRef.current);
     g.selectAll("*").remove();
 
-    // Projection et path
+    // Filtrer les départements pour ne garder que la France métropolitaine
+    // Les départements d'outre-mer ont des codes > 95 ou des codes spéciaux
+    const metropoleFeatures = geoData.features.filter((feature: any) => {
+      const code = feature.properties.code || feature.properties.CODE_DEPT;
+      const numCode = parseInt(code);
+      // Exclure les DOM-TOM (codes > 95) et les codes spéciaux
+      return numCode <= 95 && numCode > 0;
+    });
+
+    // Créer un objet GeoJSON temporaire pour la France métropolitaine uniquement
+    const metropoleGeoData = {
+      type: "FeatureCollection" as const,
+      features: metropoleFeatures,
+    };
+
+    // Créer la projection avec fitSize pour la France métropolitaine uniquement
     const projection = d3
       .geoConicConformal()
       .center([2.454071, 46.279229])
-      .scale(width * 5)
-      .translate([width / 2, height / 2]);
+      .fitSize(
+        [
+          baseWidth - responsiveMapPadding * 2,
+          baseHeight - responsiveMapPadding * 2,
+        ],
+        metropoleGeoData as any
+      );
+
+    // Appliquer un décalage pour centrer avec le padding
+    const [currentX, currentY] = projection.translate();
+    projection.translate([
+      currentX + responsiveMapPadding,
+      currentY + responsiveMapPadding,
+    ]);
+
     const path = d3.geoPath().projection(projection);
 
     // Zoom handler
@@ -72,15 +124,100 @@ const FranceMapDepartement: React.FC<Props> = ({
       g.selectAll("path").attr("stroke-width", 1 / event.transform.k);
     }
 
+    // --- TOOLTIP AMÉLIORÉ (inspiré de la pyramide des âges) ---
+    let tooltip: d3.Selection<HTMLDivElement, unknown, HTMLElement, any> =
+      d3.select<HTMLDivElement, unknown>("#map-tooltip");
+    if (tooltip.empty()) {
+      tooltip = d3
+        .select("body")
+        .append<HTMLDivElement>("div")
+        .attr("id", "map-tooltip")
+        .style("position", "absolute")
+        .style("pointer-events", "none")
+        .style("background", "rgba(15, 23, 42, 0.95)")
+        .style("color", "#f8fafc")
+        .style("padding", "8px 12px") // Padding réduit pour le contenu compact
+        .style("border-radius", "6px")
+        .style("border", "1px solid #475569")
+        .style("font-size", "14px")
+        .style("font-weight", "600")
+        .style("box-shadow", "0 4px 12px rgba(0,0,0,0.3)")
+        .style("backdrop-filter", "blur(8px)")
+        .style("opacity", 0)
+        .style("z-index", "1000")
+        .style("transition", "opacity 0.2s ease"); // Transition douce
+    }
+
+    // Fonction d'affichage du tooltip
+    function showTooltip(event: MouseEvent, d: any) {
+      const code = normalizeCode(d.properties.code);
+      const depData = data?.find(
+        (dep: PopulationDepartement) => normalizeCode(dep.id) === code
+      ) || null;
+      
+      const properties = depData || d.properties;
+      const nom = properties?.nom || properties?.name || "Département";
+      
+      // Contenu simplifié avec juste le nom du département
+      const content = `<div style="text-align: center; font-weight: 600; font-size: 14px;">${nom}</div>`;
+      
+      // Calculer la position du centroid du département dans l'écran
+      const svgNode = ref.current;
+      const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
+      const centroid = path.centroid(d);
+      const transformedCentroid = transform.apply(centroid);
+      const svgRect = ref.current!.getBoundingClientRect();
+      
+      // Position du tooltip centrée sur le département
+      const screenX = svgRect.left + transformedCentroid[0];
+      const screenY = svgRect.top + transformedCentroid[1] + window.scrollY;
+      
+      // Afficher le tooltip avec le contenu d'abord pour mesurer ses dimensions
+      tooltip
+        .style("opacity", 0) // Invisible pendant la mesure
+        .html(content)
+        .style("left", "0px")
+        .style("top", "0px");
+      
+      // Mesurer les dimensions réelles du tooltip
+      const tooltipNode = tooltip.node();
+      const tooltipRect = tooltipNode!.getBoundingClientRect();
+      const tooltipWidth = tooltipRect.width;
+      const tooltipHeight = tooltipRect.height - 30;
+      
+      // Calculer la position finale en centrant sur le département
+      let finalX = screenX - tooltipWidth / 2;
+      let finalY = screenY - tooltipHeight - 15; // Au-dessus du département
+      
+      // Vérifier les limites de l'écran et ajuster si nécessaire
+      if (finalX < 10) finalX = 10;
+      if (finalX + tooltipWidth > window.innerWidth - 10) {
+        finalX = window.innerWidth - tooltipWidth - 10;
+      }
+      if (finalY < 10) {
+        finalY = screenY + 15; // En dessous si pas de place au-dessus
+      }
+      
+      // Positionner et rendre visible le tooltip
+      tooltip
+        .style("opacity", 1)
+        .style("left", finalX + "px")
+        .style("top", finalY + "px");
+    }
+    
+    function hideTooltip() {
+      tooltip.style("opacity", 0);
+    }
+
     // Zoom config (stocké en ref pour usage programmatique)
     if (!zoomRef.current) {
       zoomRef.current = d3.zoom().scaleExtent([1, 8]).on("zoom", zoomed);
     }
     svg
-      .attr("viewBox", [0, 0, width, height])
-      .attr("width", width)
-      .attr("height", height)
-      .attr("style", "max-width: 100%; height: auto;")
+      .attr("viewBox", `0 0 ${baseWidth} ${baseHeight}`)
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .attr("style", "max-width: 100%; height: auto; display: block;")
       .on("click", reset)
       .call(zoomRef.current as any);
 
@@ -96,35 +233,26 @@ const FranceMapDepartement: React.FC<Props> = ({
       .attr("stroke-width", 1)
       .attr("cursor", "pointer")
       .on("click", clicked)
-      .on("mouseover", function (_: any, d: any) {
+      .on("mouseover", function (event: any, d: any) {
         const svgNode = ref.current;
         const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
-        const centroid = path.centroid(d);
-        const svgRect = ref.current!.getBoundingClientRect();
-        const screenX = svgRect.left + centroid[0];
-        const screenY = svgRect.top + centroid[1] + window.scrollY;
-        const code = normalizeCode(d.properties.code);
-        const depData =
-          data?.find(
-            (dep: PopulationDepartement) => normalizeCode(dep.id) === code
-          ) || null;
-        setHoveredRegion({
-          properties: depData || d.properties,
-          centroid: centroid,
-          screenPosition: {
-            x: screenX,
-            y: screenY,
-          },
-        });
+        
+        showTooltip(event, d);
+        
         d3.select(this)
           .attr("stroke", "#f59e42")
           .attr("stroke-width", 1 / transform.k)
           .raise();
       })
+      .on("mousemove", function (event: any, d: any) {
+        showTooltip(event, d);
+      })
       .on("mouseout", function () {
         const svgNode = ref.current;
         const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
-        setHoveredRegion(null);
+        
+        hideTooltip();
+        
         d3.select(this)
           .attr("stroke", "#e5e5e530")
           .attr("stroke-width", 1 / transform.k);
@@ -176,9 +304,12 @@ const FranceMapDepartement: React.FC<Props> = ({
         .call(
           (zoomRef.current as any).transform,
           d3.zoomIdentity
-            .translate(width / 2, height / 2)
+            .translate(baseWidth / 2, baseHeight / 2)
             .scale(
-              Math.min(8, 0.9 / Math.max((x1 - x0) / width, (y1 - y0) / height))
+              Math.min(
+                8,
+                0.9 / Math.max((x1 - x0) / baseWidth, (y1 - y0) / baseHeight)
+              )
             )
             .translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
         );
@@ -213,7 +344,7 @@ const FranceMapDepartement: React.FC<Props> = ({
     }
 
     setSvgReady(true);
-  }, [geoData, width, height, data, setSelectedDep]);
+  }, [geoData, width, height, data, setSelectedDep, responsiveMapPadding]);
 
   useEffect(() => {
     if (!selectedDep || !ref.current || !gRef.current || !geoData || !svgReady)
@@ -241,7 +372,6 @@ const FranceMapDepartement: React.FC<Props> = ({
 
     if (!node) return;
 
-    // d3.select(node).transition().attr("fill", "#00ff00");
     // Animation GSAP sur le fill
     gsap.to(node, {
       duration: 0.5,
@@ -249,16 +379,40 @@ const FranceMapDepartement: React.FC<Props> = ({
       ease: "power2.out",
     });
 
-    const svgWidth = Number(svg.attr("width")) || 800;
-    const svgHeight = Number(svg.attr("height")) || 934;
+    // Filtrer les départements pour ne garder que la France métropolitaine
+    const metropoleFeatures = geoData.features.filter((feature: any) => {
+      const code = feature.properties.code || feature.properties.CODE_DEPT;
+      const numCode = parseInt(code);
+      return numCode <= 95 && numCode > 0;
+    });
 
+    // Créer un objet GeoJSON temporaire pour la France métropolitaine uniquement
+    const metropoleGeoData = {
+      type: "FeatureCollection" as const,
+      features: metropoleFeatures,
+    };
+
+    // Utiliser la même logique de projection que dans le premier useEffect
     const projection = d3
       .geoConicConformal()
       .center([2.454071, 46.279229])
-      .scale(svgWidth * 5)
-      .translate([svgWidth / 2, svgHeight / 2]);
+      .fitSize(
+        [
+          baseWidth - responsiveMapPadding * 2,
+          baseHeight - responsiveMapPadding * 2,
+        ],
+        metropoleGeoData as any
+      );
+
+    // Appliquer un décalage pour centrer avec le padding
+    const [currentX, currentY] = projection.translate();
+    projection.translate([
+      currentX + responsiveMapPadding,
+      currentY + responsiveMapPadding,
+    ]);
 
     const path = d3.geoPath().projection(projection);
+
     const [[x0, y0], [x1, y1]] = path.bounds(feature);
 
     svg
@@ -267,26 +421,18 @@ const FranceMapDepartement: React.FC<Props> = ({
       .call(
         (zoomRef.current as any).transform,
         d3.zoomIdentity
-          .translate(svgWidth / 2, svgHeight / 2)
+          .translate(baseWidth / 2, baseHeight / 2)
           .scale(
             Math.min(
               8,
-              0.9 / Math.max((x1 - x0) / svgWidth, (y1 - y0) / svgHeight)
+              0.9 / Math.max((x1 - x0) / baseWidth, (y1 - y0) / baseHeight)
             )
           )
           .translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
       );
-  }, [selectedDep, geoData, svgReady]);
+  }, [selectedDep, geoData, svgReady, responsiveMapPadding]);
 
-  useLayoutEffect(() => {
-    if (hoveredRegion && tooltipRef.current) {
-      gsap.fromTo(
-        tooltipRef.current,
-        { scale: 0.8, y: 20 },
-        { scale: 1, y: 0, duration: 0.5, ease: "power2.out" }
-      );
-    }
-  }, [hoveredRegion]);
+
 
   if (!data)
     return (
@@ -297,105 +443,86 @@ const FranceMapDepartement: React.FC<Props> = ({
     );
 
   return (
-    <div className="w-full mx-auto min-w-[300px] lg:min-w-[1008px]">
-      {/* <div className="opacity-10">
-        <Background />
-      </div> */}
+    <div className="w-full mx-auto h-full">
       <motion.div
-        ref={tooltipRef}
+        ref={containerRef}
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="relative bg-zinc-600/00 text-white p-1 rounded-xl z-50 min-w-[250px]"
-        style={{
-          WebkitMaskImage:
-            "radial-gradient(circle at 50% 50%, #000 80%, transparent 100%)",
-          maskImage:
-            "radial-gradient(circle at 50% 50%, #000 80%, transparent 100%)",
-        }}
+        className="relative bg-gradient-to-br from-gray-900/40 to-gray-900/20 backdrop-blur-sm rounded-xl border border-gray-700/50 shadow-2xl shadow-gray-900/50 transition-all duration-300 hover:shadow-3xl hover:border-gray-600/50 text-white w-full h-full max-w-7xl mx-auto py-1"
+        // style={{
+        //   WebkitMaskImage:
+        //     "radial-gradient(circle at 50% 50%, #000 80%, transparent 100%)",
+        //   maskImage:
+        //     "radial-gradient(circle at 50% 50%, #000 80%, transparent 100%)",
+        // }}
       >
-        <button
-          className="absolute top-4 right-4 z-50 bg-white text-black p-1 rounded-full shadow hover:bg-white hover:text-gray-800 transition cursor-pointer"
-          onClick={() => {
-            if (ref.current && zoomRef.current) {
-              d3.select(ref.current)
-                .transition()
-                .duration(750)
-                .call((zoomRef.current as any).transform, d3.zoomIdentity);
-              setSelectedDep(null);
-            }
-          }}
-        >
-          <LucideChevronsRightLeft className="rotate-45" />
-        </button>
-        <svg
-          ref={ref}
-          className="w-full h-auto"
-          //shadow-xl rounded-xl border border-gray-200/10 bg-gray-300/10
-        >
-          <g ref={gRef} />
-        </svg>
-
-        {hoveredRegion && (
-          <motion.div
-            ref={tooltipRef}
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="fixed bg-zinc-600/0 text-white p-1 rounded-sm shadow-lg z-50 transform pointer-events-none min-w-[250px]"
-            style={{
-              left: hoveredRegion.screenPosition.x + 30,
-              top: hoveredRegion.screenPosition.y - 40,
+        {/* Header avec titre - Responsive */}
+        <div className="flex items-center justify-between p-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-0.5 sm:w-1 h-6 sm:h-8 bg-gradient-to-b from-blue-400 to-green-400 rounded-full"></div>
+            <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tracking-tight">
+              Carte de France
+            </h3>
+          </div>
+          <button
+            className="bg-white/90 backdrop-blur-sm text-gray-900 p-1.5 sm:p-2 rounded-full shadow-lg hover:bg-white hover:shadow-xl transition-all duration-200 cursor-pointer"
+            onClick={() => {
+              if (ref.current && zoomRef.current) {
+                d3.select(ref.current)
+                  .transition()
+                  .duration(750)
+                  .call((zoomRef.current as any).transform, d3.zoomIdentity);
+                setSelectedDep(null);
+              }
             }}
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-bold text-2xl">
-                  {hoveredRegion.properties?.nom ||
-                    hoveredRegion.properties?.name}
-                </CardTitle>
-                <CardDescription>
-                  Code :{" "}
-                  {hoveredRegion.properties?.id ||
-                    hoveredRegion.properties?.code ||
-                    hoveredRegion.properties?.name}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {hoveredRegion.properties?.ensemble ? (
-                  <>
-                    <div>
-                      Population totale :{" "}
-                      {hoveredRegion.properties.ensemble.total?.toLocaleString() ??
-                        "?"}
-                    </div>
-                    <div>
-                      Hommes :{" "}
-                      {hoveredRegion.properties.hommes.total?.toLocaleString() ??
-                        "?"}
-                    </div>
-                    <div>
-                      Femmes :{" "}
-                      {hoveredRegion.properties.femmes.total?.toLocaleString() ??
-                        "?"}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-xs text-gray-400">
-                    Aucune donnée de population
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter>
-                <p className="font-light text-xs text-foreground/50">
-                  Daril.fr @ All Rights Reserved
-                </p>
-              </CardFooter>
-            </Card>
-          </motion.div>
-        )}
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Conteneur de la carte avec bordure subtile et aspect ratio responsive */}
+        <div className="relative px-3 pb-3">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-transparent to-green-500/10 rounded-lg mx-3 mb-3 "></div>
+          <div
+            className="relative bg-gray-900/30 rounded-lg border border-gray-800/40 w-full overflow-hidden"
+            style={{
+              aspectRatio: `${baseWidth} / ${baseHeight}`,
+              minHeight: "250px",
+              // maxHeight: "min(70vh, 600px)",
+            }}
+          >
+            {/* Padding interne responsive pour le SVG */}
+            <div className="p-2 w-full h-full">
+              <svg
+                ref={ref}
+                viewBox={`0 0 ${baseWidth} ${baseHeight}`}
+                preserveAspectRatio="xMidYMid meet"
+                className="w-full h-full"
+                style={{
+                  maxWidth: "100%",
+                  height: "auto",
+                  display: "block",
+                }}
+              >
+                <g ref={gRef} />
+              </svg>
+            </div>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

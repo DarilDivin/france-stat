@@ -1,308 +1,409 @@
 import { useRef, useEffect, useState } from "react";
 import * as d3 from "d3";
 import { PopulationDepartement } from "@/types/population";
-import { endianness } from "os";
 import gsap from "gsap";
 
 type Props = {
   department: PopulationDepartement | null;
 };
 
-export default function PopulationPieChart({ department }: Props) {
-  const [tooltip, setTooltip] = useState<{
-    visible: boolean;
-    x: number;
-    y: number;
-    value: number;
-    label: string;
-    percent: string;
-  } | null>(null);
+type PieData = {
+  label: string;
+  value: number;
+  color: string;
+};
 
-  const tooltipRef = useRef<HTMLDivElement>(null);
+// Configuration constants
+const CHART_CONFIG = {
+  width: 300,
+  height: 300,
+  padding: 30,
+  cornerRadius: 6,
+  padAngle: 0.04,
+  innerRadius: 0.15,
+  animationDuration: 1.0,
+  hoverDuration: 0.25,
+};
+
+const PIE_GROUPS = [
+  { key: "hommes", label: "Hommes", baseColor: "#3b82f6" },
+  { key: "femmes", label: "Femmes", baseColor: "#f472b6" },
+] as const;
+
+export default function PopulationPieChart({ department }: Props) {
+  const [activeLegend, setActiveLegend] = useState<string | null>(null);
   const ref = useRef<SVGSVGElement>(null);
 
-  let width = 300;
-  let height = 220;
+  // Prepare data for both chart and legend
+  const data: PieData[] = department ? [
+    {
+      label: "Hommes",
+      value: department.hommes.total ?? 0,
+      color: PIE_GROUPS[0].baseColor,
+    },
+    {
+      label: "Femmes",
+      value: department.femmes.total ?? 0,
+      color: PIE_GROUPS[1].baseColor,
+    },
+  ] : [];
 
   useEffect(() => {
-    if (!department || !ref.current) return;
-
-    // Utilise la même couleur de base mais nuances différentes pour hommes/femmes
-    const baseColor = "#10b981";
-    const data = [
-      {
-        label: "Hommes",
-        value: department.hommes.total ?? 0,
-        color: d3.color(baseColor)!.darker(1.5).formatHex(),
-      },
-      {
-        label: "Femmes",
-        value: department.femmes.total ?? 0,
-        color: d3.color(baseColor)!.brighter(1.2).formatHex(),
-      },
-    ];
+    if (!department || !ref.current || data.length === 0) return;
 
     const svgElement = ref.current;
-    width = svgElement?.width.baseVal.value || 300;
-    height = svgElement?.height.baseVal.value || 220;
-    const radius = Math.min(width, height) / 2 - 10; // -10 pour éviter de toucher les bords
-    const svg = d3.select(ref.current);
+    const { width, height } = CHART_CONFIG;
+    const radius = Math.min(width, height) / 2 - CHART_CONFIG.padding;
 
-    let defs: d3.Selection<SVGDefsElement, unknown, null, undefined> =
-      svg.select("defs");
+    const svg = d3.select(svgElement);
+    
+    // Setup gradients (only once)
+    let defs = svg.select<SVGDefsElement>("defs");
     if (defs.empty()) {
-      defs = svg.append("defs");
+      defs = svg.append<SVGDefsElement>("defs");
     }
+    
+    // Update gradients
     data.forEach((d, i) => {
       const gradId = `pie-gradient-${i}`;
-      if (defs.select(`#${gradId}`).empty()) {
-        const gradient = defs
-          .append("linearGradient")
+      let gradient = defs.select<SVGLinearGradientElement>(`#${gradId}`);
+      if (gradient.empty()) {
+        gradient = defs
+          .append<SVGLinearGradientElement>("linearGradient")
           .attr("id", gradId)
           .attr("x1", "0%")
           .attr("y1", "0%")
           .attr("x2", "100%")
           .attr("y2", "100%");
-        gradient
-          .append("stop")
-          .attr("offset", "0%")
-          .attr("stop-color", d3.color(d.color)!.brighter(0.7).formatHex());
-        gradient
-          .append("stop")
-          .attr("offset", "100%")
-          .attr("stop-color", d3.color(d.color)!.darker(1.2).formatHex());
+        
+        gradient.append("stop").attr("offset", "0%");
+        gradient.append("stop").attr("offset", "100%");
       }
+      
+      gradient.select("stop:first-child")
+        .attr("stop-color", d3.color(d.color)!.brighter(0.7).formatHex());
+      
+      gradient.select("stop:last-child")
+        .attr("stop-color", d3.color(d.color)!.darker(1.2).formatHex());
     });
 
-    // On ne supprime pas tout le SVG, seulement la légende
-    svg.selectAll(".legend-group").remove();
-
+    // Setup pie and arc generators
     const pie = d3
-      .pie<{ label: string; value: number; color: string }>()
+      .pie<PieData>()
       .value((d) => d.value)
-      .padAngle(0.04) // Espace entre les parts
+      .padAngle(CHART_CONFIG.padAngle)
       .sort(null);
 
     const arc = d3
-      .arc<d3.PieArcDatum<{ label: string; value: number; color: string }>>()
-      .innerRadius(radius * 0.12) // Rayon intérieur pour créer un donut
+      .arc<d3.PieArcDatum<PieData>>()
+      .innerRadius(radius * CHART_CONFIG.innerRadius)
       .outerRadius(radius)
-      .cornerRadius(6); // Coins arrondis
+      .cornerRadius(CHART_CONFIG.cornerRadius);
 
-    // Groupe central
-    let g = svg.select<SVGGElement>(".pie-group");
+    // Setup main group (only once)
+    let g = svg.select<SVGGElement>("g.pie-group");
     if (g.empty()) {
-      g = svg.append("g").attr("class", "pie-group");
+      g = svg
+        .append<SVGGElement>("g")
+        .attr("class", "pie-group")
+        .attr("transform", `translate(${width / 2}, ${height / 2})`);
     }
-    g.attr("transform", `translate(${width / 2},${height / 2})`);
 
-    // DATA JOIN
-    const arcs = g
-      .selectAll<SVGPathElement, d3.PieArcDatum<(typeof data)[0]>>("path")
-      .data(pie(data), (d) => d.data.label);
+    const total = data.reduce((sum, d) => sum + d.value, 0);
+    const pieData = pie(data);
 
-    // ENTER
-    arcs
+    // --- TOOLTIP D3 (inspiré de la pyramide des âges) ---
+    let tooltip: d3.Selection<HTMLDivElement, unknown, HTMLElement, any> =
+      d3.select<HTMLDivElement, unknown>("#piechart-tooltip");
+    if (tooltip.empty()) {
+      tooltip = d3
+        .select("body")
+        .append<HTMLDivElement>("div")
+        .attr("id", "piechart-tooltip")
+        .style("position", "absolute")
+        .style("pointer-events", "none")
+        .style("background", "rgba(15, 23, 42, 0.95)")
+        .style("color", "#f8fafc")
+        .style("padding", "12px 16px")
+        .style("border-radius", "8px")
+        .style("border", "1px solid #475569")
+        .style("font-size", "13px")
+        .style("font-weight", "500")
+        .style("box-shadow", "0 4px 12px rgba(0,0,0,0.3)")
+        .style("backdrop-filter", "blur(8px)")
+        .style("opacity", 0)
+        .style("z-index", "1000")
+        .style("min-width", "160px");
+    }
+
+    // Fonctions de gestion du tooltip
+    function showTooltip(event: MouseEvent, d: d3.PieArcDatum<PieData>) {
+      const percent = total > 0 ? `${((d.data.value / total) * 100).toFixed(1)}%` : "0%";
+      
+      tooltip
+        .style("opacity", 1)
+        .html(
+          `<div style="margin-bottom: 6px; font-weight: bold;">${d.data.label}</div>
+           <div style="margin-bottom: 4px;">Population : <strong>${d.data.value.toLocaleString("fr-FR")}</strong></div>
+           <div style="color: #94a3b8; font-size: 11px;">${percent} du total</div>`
+        )
+        .style("left", event.pageX + 15 + "px")
+        .style("top", event.pageY - 50 + "px");
+    }
+    
+    function hideTooltip() {
+      tooltip.style("opacity", 0);
+    }
+
+    // DATA JOIN for pie slices
+    const slices = g
+      .selectAll<SVGPathElement, d3.PieArcDatum<PieData>>("path.pie-slice")
+      .data(pieData, (d: any) => d.data.label);
+
+    // ENTER - new slices
+    const slicesEnter = slices
       .enter()
-      .append("path")
-      // .attr("fill", (d) => (d.data as any).color)
+      .append<SVGPathElement>("path")
+      .attr("class", "pie-slice")
       .attr("fill", (d, i) => `url(#pie-gradient-${i})`)
       .attr("stroke", "transparent")
-      .attr("stroke-width", 4)
+      .attr("stroke-width", 2)
+      .style("cursor", "pointer")
       .on("mouseover", function (event, d) {
-        const rect = (event.target as SVGPathElement).getBoundingClientRect();
-        const total = data.reduce((sum, dd) => sum + dd.value, 0);
-        const percent = total > 0 ? `${((d.data.value / total) * 100).toFixed(1)}%` : "";
-        setTooltip({
-          visible: true,
-          x: rect.left + rect.width / 2,
-          y: rect.top,
-          value: d.data.value,
-          label: d.data.label,
-          percent,
-        });
+        // Highlight effect
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("stroke", "#ffffff")
+          .attr("stroke-width", 3);
+        
+        showTooltip(event, d);
       })
-      .on("mouseout", function () {
-        setTooltip(null);
-      })
-      .each(function (d) {
-        // Commence à 0° de remplissage
-        (this as any)._current = { ...d, endAngle: d.startAngle };
-        // Animation GSAP du remplissage
-        gsap.to((this as any)._current, {
-          endAngle: d.endAngle,
-          duration: 1.5,
-          ease: "elastic.out(1, 0.3)",
-          onUpdate: () => {
-            d3.select(this).attr("d", arc((this as any)._current));
-          },
-        });
-      })
-      .attr("d", function (d) {
-        // Affiche l'état initial (invisible)
-        return arc({ ...d, endAngle: d.startAngle }) || "";
+      .on("mouseout", function() {
+        // Remove highlight
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("stroke", "transparent")
+          .attr("stroke-width", 2);
+        
+        hideTooltip();
       });
 
-    // UPDATE
-    arcs
-      .each(function (d) {
-        // On récupère l'état courant ou on initialise à la position de départ
-        const current = (this as any)._current || {
-          ...d,
-          endAngle: d.startAngle,
-          startAngle: d.startAngle,
-        };
-        // On crée un objet mutable pour GSAP
-        const anim = { ...current };
-        gsap.to(anim, {
-          startAngle: d.startAngle,
-          endAngle: d.endAngle,
-          duration: 1.5,
-          ease: "elastic.out(1, 0.3)",
-          onUpdate: () => {
-            d3.select(this).attr("d", arc(anim));
-          },
-          onComplete: () => {
-            (this as any)._current = { ...anim };
-          },
-        });
-      })
-      // .attr("fill", (d) => (d.data as any).color);
+    // Animate new slices from 0 to final position
+    slicesEnter.each(function (d) {
+      const element = this as SVGPathElement;
+      
+      // Start from 0 angle at the beginning of the pie
+      const startAngle = 0;
+      const endAngle = 0;
+      
+      // Set initial state (invisible)
+      d3.select(element).attr("d", arc({
+        ...d,
+        startAngle: startAngle,
+        endAngle: endAngle
+      }));
+      
+      // Store current state for future updates
+      (element as any)._current = { ...d, startAngle: startAngle, endAngle: endAngle };
+    });
+
+    // UPDATE - existing slices (just update fill, no animation here)
+    slices
       .attr("fill", (d, i) => `url(#pie-gradient-${i})`);
 
-    // EXIT
-    arcs
-      .exit()
-      .transition()
-      .duration(700)
-      .attrTween("d", function (this: SVGPathElement, d) {
-        // On fait disparaître l'arc en le réduisant à zéro
-        const datum = d as d3.PieArcDatum<{
-          label: string;
-          value: number;
-          color: string;
-        }>;
-        const i = d3.interpolate((this as any)._current, datum);
-        return (t) => arc(i(t)) || "";
-      })
-      .remove();
+    // MERGE - combine enter and update selections for synchronized animation
+    const allSlices = slicesEnter.merge(slices);
+    
+    // Animate all slices together to ensure synchronized movement
+    allSlices.each(function (d) {
+      const element = this as SVGPathElement;
+      const current = (element as any)._current || { ...d, startAngle: 0, endAngle: 0 };
+      
+      // Animate both start and end angles simultaneously
+      gsap.to(current, {
+        startAngle: d.startAngle,
+        endAngle: d.endAngle,
+        duration: CHART_CONFIG.animationDuration,
+        ease: "elastic.out(1, 0.3)",
+        onUpdate: () => {
+          d3.select(element).attr("d", arc(current));
+        },
+        onComplete: () => {
+          (element as any)._current = { ...current };
+        }
+      });
+    });
 
-    g.selectAll("text.pie-label").remove();
-
-    // Ajoute les nouveaux labels de pourcentage
-    const total = data.reduce((sum, d) => sum + d.value, 0);
-    // Ajoute les labels carrés au centre de chaque part
-    g.selectAll("g.pie-label-group").remove();
-
-    const labelGroups = g
-      .selectAll("g.pie-label-group")
-      .data(pie(data), (d: any) => d.data.label)
-      .enter()
-      .append("g")
-      .attr("class", "pie-label-group")
-      .attr("transform", (d) => {
-        const [x, y] = arc.centroid(d as any);
-        return `translate(${x},${y})`;
+    // EXIT - remove old slices
+    slices.exit()
+      .each(function (d) {
+        const element = this as SVGPathElement;
+        const current = (element as any)._current || d;
+        
+        // Animate to 0 angle
+        gsap.to(current, {
+          startAngle: current.startAngle,
+          endAngle: current.startAngle,
+          duration: CHART_CONFIG.animationDuration * 0.5,
+          ease: "power2.out",
+          onUpdate: () => {
+            d3.select(element).attr("d", arc(current));
+          },
+          onComplete: () => {
+            d3.select(element).remove();
+          }
+        });
       });
 
-    labelGroups
+    // DATA JOIN for labels
+    const labelGroups = g
+      .selectAll<SVGGElement, d3.PieArcDatum<PieData>>("g.pie-label-group")
+      .data(pieData, (d: any) => d.data.label);
+
+    // ENTER - new labels
+    const labelGroupsEnter = labelGroups
+      .enter()
+      .append<SVGGElement>("g")
+      .attr("class", "pie-label-group")
+      .attr("transform", "translate(0,0)")
+      .style("opacity", 0);
+
+    // Initialize label position
+    labelGroupsEnter.each(function (d) {
+      const element = this as SVGGElement;
+      // Store initial state for animation
+      (element as any)._current = { ...d, startAngle: 0, endAngle: 0 };
+    });
+
+    labelGroupsEnter
       .append("rect")
-      .attr("x", -18)
-      .attr("y", -18)
-      .attr("width", 36)
-      .attr("height", 36)
-      .attr("rx", 8)
-      .attr("fill", "#eee3") // couleur de fond, ajuste selon ton thème
-      .attr("stroke", "#ffffff80")
+      .attr("x", -16)
+      .attr("y", -16)
+      .attr("width", 32)
+      .attr("height", 32)
+      .attr("rx", 6)
+      .attr("fill", "rgba(238, 238, 238, 0.2)")
+      .attr("stroke", "rgba(255, 255, 255, 0.5)")
       .attr("stroke-width", 1);
 
-    labelGroups
+    labelGroupsEnter
       .append("text")
-      .text((d) => {
-        const percent = total > 0 ? (d.data.value / total) * 100 : 0;
-        return percent > 2 ? `${percent.toFixed(1)}%` : ""; // n'affiche pas les toutes petites parts
-      })
       .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle") // meilleure centrage vertical
-      .attr("dy", "0.05em") // léger ajustement vertical
+      .attr("dominant-baseline", "middle")
+      .attr("dy", "0.05em")
       .attr("fill", "#fff")
-      .attr("font-size", 10)
+      .attr("font-size", 9)
       .attr("font-weight", "bold");
 
-    // Légende
-    const legend = svg
-      .append("g")
-      .attr("class", "legend-group")
-      .attr("transform", `translate(0,${height - 50})`);
-    data.forEach((d, i) => {
-      legend
-        .append("rect")
-        .attr("x", 0)
-        .attr("y", i * 22)
-        .attr("rx", 100)
-        .attr("ry", 100)
-        .attr("width", 16)
-        .attr("height", 16)
-        .attr("fill", d.color);
-      legend
-        .append("text")
-        .attr("x", 24)
-        .attr("y", i * 22 + 13)
-        .text(d.label)
-        .attr("font-size", 13)
-        .attr("fill", "#eeeeee");
-    });
-  }, [department]);
+    // UPDATE - all labels (enter + update)
+    const labelGroupsUpdate = labelGroupsEnter.merge(labelGroups);
 
-  useEffect(() => {
-    if (tooltip?.visible && tooltipRef.current) {
-      gsap.fromTo(
-        tooltipRef.current,
-        { opacity: 0, y: 10, scale: 0.95 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.25, ease: "power2.out" }
-      );
-    }
-  }, [tooltip]);
+    // Animate labels to follow their corresponding slices
+    labelGroupsUpdate.each(function (d) {
+      const element = this as SVGGElement;
+      const labelCurrent = (element as any)._current || { ...d, startAngle: 0, endAngle: 0 };
+      
+      // Animate label position to follow slice
+      gsap.to(labelCurrent, {
+        startAngle: d.startAngle,
+        endAngle: d.endAngle,
+        duration: CHART_CONFIG.animationDuration,
+        ease: "elastic.out(1, 0.3)",
+        onUpdate: () => {
+          const [x, y] = arc.centroid(labelCurrent);
+          d3.select(element).attr("transform", `translate(${x},${y})`);
+        },
+        onComplete: () => {
+          (element as any)._current = { ...labelCurrent };
+        }
+      });
+    });
+
+    // Show labels with fade in
+    labelGroupsUpdate
+      .transition()
+      .duration(CHART_CONFIG.animationDuration * 500)
+      .delay(CHART_CONFIG.animationDuration * 300)
+      .style("opacity", 1);
+
+    // Update text content
+    labelGroupsUpdate
+      .select("text")
+      .text((d) => {
+        const percent = total > 0 ? (d.data.value / total) * 100 : 0;
+        return percent > 2 ? `${percent.toFixed(1)}%` : "";
+      });
+
+    // EXIT - remove old labels
+    labelGroups.exit()
+      .transition()
+      .duration(CHART_CONFIG.animationDuration * 500)
+      .style("opacity", 0)
+      .remove();
+
+  }, [department, data]);
 
   if (!department) return null;
 
   return (
-    <div className="bg-background/00 rounded-lg p-4 mb-4 flex flex-col justify-center items-start">
-      {/* <p className="text-md text-left font-semibold mb-2">Répartition Hommes / Femmes</p> */}
-      <svg
-        ref={ref}
-        width={300}
-        height={220}
-        viewBox={`0 0 ${width} ${height}`}
-      />
-      {tooltip?.visible && (
-        <div
-          ref={tooltipRef}
-          style={{
-            position: "fixed",
-            left: tooltip.x + 16,
-            top: tooltip.y - 32,
-            pointerEvents: "none",
-            zIndex: 100,
-            background: "rgba(30,30,40,0.97)",
-            color: "#fff",
-            padding: "8px 14px",
-            borderRadius: 8,
-            boxShadow: "0 2px 12px #0004",
-            fontSize: 14,
-            fontWeight: 500,
-            transition: "box-shadow 0.2s",
-          }}
-        >
-          <div>
-            <b>{tooltip.label}</b> -{" "}
-            <span style={{ color: "#aaa" }}>{tooltip.percent}</span>
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>
-            {tooltip.value.toLocaleString("fr-FR")}
+    <div className=" w-full bg-gradient-to-br from-gray-900/40 to-gray-900/20 backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 shadow-2xl shadow-gray-900/50 transition-all duration-300 hover:shadow-3xl hover:border-gray-600/50">
+      {/* Header modernisé */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-1 h-6 bg-gradient-to-b from-pink-400 to-blue-400 rounded-full"></div>
+        <h3 className="text-lg font-semibold text-gray-100 tracking-tight">
+          Répartition Hommes / Femmes
+        </h3>
+      </div>
+
+      {/* Légende interactive dans la card */}
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mb-3">
+        {data.map((item, index) => (
+          <button
+            key={item.label}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+              activeLegend === item.label
+                ? 'bg-gray-800/60 shadow-lg'
+                : 'hover:bg-gray-800/30'
+            }`}
+            onMouseEnter={() => setActiveLegend(item.label)}
+            onMouseLeave={() => setActiveLegend(null)}
+          >
+            <div 
+              className="w-3 h-3 rounded-full ring-2 ring-gray-700"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="text-xs sm:text-sm font-medium text-gray-300">
+              {item.label}
+            </span>
+            {department && (
+              <span className="text-xs text-gray-400 ml-1 hidden sm:inline">
+                {item.value.toLocaleString('fr-FR')}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      
+      {/* Conteneur du graphique - Responsive */}
+      <div className="relative w-full">
+        <div className="absolute inset-0 bg-gradient-to-r from-pink-500/5 via-transparent to-blue-500/5 rounded-lg"></div>
+        <div className="relative bg-gray-900/30 rounded-lg p-3 border border-gray-800/40">
+          {/* Conteneur responsive avec aspect ratio carré et breakpoints */}
+          <div 
+            className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-sm xl:max-w-md mx-auto" 
+            style={{ aspectRatio: '1/1' }}
+          >
+            <svg
+              ref={ref}
+              className="w-full h-full drop-shadow-lg"
+              viewBox={`0 0 ${CHART_CONFIG.width} ${CHART_CONFIG.height}`}
+              preserveAspectRatio="xMidYMid meet"
+            />
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
