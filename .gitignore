@@ -45,4 +45,4 @@ next-env.d.ts
 __pycache__/
 
 # fichiers perso à ignorer
-/api/population
+old
