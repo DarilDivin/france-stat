@@ -43,3 +43,6 @@ next-env.d.ts
 # python virtual environment
 .venv/
 __pycache__/
+
+# fichiers perso à ignorer
+/api/population
