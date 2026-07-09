@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     // Note: optimizeCss disabled due to critters module issue
   },
   // Externaliser les gros packages pour réduire la taille des fonctions serverless
-  serverExternalPackages: ['d3', 'gsap', 'topojson-client'],
+  serverExternalPackages: ['d3', 'gsap'],
   // Configuration webpack pour l'optimisation
   webpack: (config, { isServer }) => {
     // Pour le serveur, externaliser les gros packages pour réduire la taille des fonctions serverless
@@ -28,7 +28,6 @@ const nextConfig: NextConfig = {
         'd3-color': 'commonjs d3-color',
         'd3-axis': 'commonjs d3-axis',
         'gsap': 'commonjs gsap',
-        'topojson-client': 'commonjs topojson-client',
       });
     }
 

@@ -29,10 +29,6 @@ export function PopulationContextProvider({
   const [selectedDep, setSelectedDep] = useState<PopulationDepartement | null>(null);
 
   useEffect(() => {
-    // const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "";
-    // const url = apiUrl ? `${apiUrl}/api/population` : "/api/population";
-    // fetch("http://localhost:8000/api/population")
-    // fetch(url)
     fetch("/data/population.json")
       .then((res) => res.json())
       .then(setData);
