@@ -20,6 +20,34 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Données
+
+Toutes les données sont statiques, servies depuis `public/data/` — il n'y a aucune route API ni serveur de données.
+
+| Fichier | Rôle |
+|---|---|
+| `estim-pop-dep-sexe-gca-1975-2023.xls` | Téléchargement INSEE brut d'origine (série 1975-2023, population par département/sexe/âge). Conservé comme archive de référence — **non lu par le code**. |
+| `estim-pop-dep-2023.csv` | Extrait de l'année 2023 découpé depuis le fichier ci-dessus. C'est l'unique entrée du pipeline de conversion. |
+| `population.json` | Généré à partir du CSV par [`scripts/convert.ts`](scripts/convert.ts). C'est le seul fichier de données réellement consommé par l'application (`hooks/usePopulationData.tsx`). |
+| `france-departements-avec-outre-mer.geojson` | Contours géographiques des 101 départements (métropole + DOM), utilisé par la carte. Indépendant du pipeline de population. |
+
+Source : [INSEE — Estimations de population par département, sexe et grande classe d'âge](https://www.insee.fr/fr/statistiques/1893198).
+
+### Régénérer `population.json`
+
+Si `estim-pop-dep-2023.csv` change (nouvelle année, correction), régénérer le JSON avec :
+
+```bash
+pnpm data:convert
+```
+
+Le script ([`scripts/convert.ts`](scripts/convert.ts)) parse le CSV, puis valide les données avant d'écrire le fichier :
+- vérifie que chaque département a un code et un nom ;
+- vérifie qu'il n'y a ni doublon, ni département manquant ou inattendu par rapport à la liste des codes INSEE connus ;
+- vérifie que `hommes + femmes = ensemble` pour chaque tranche d'âge et le total.
+
+En cas d'incohérence, le script affiche le détail des erreurs, s'arrête avec un code de sortie non nul, et **n'écrit pas** `population.json` — les données publiées restent donc toujours cohérentes.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
