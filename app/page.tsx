@@ -8,6 +8,7 @@ import { aggregateFrance } from "@/utils/aggregateFrance";
 import PopulationSplitBar from "@/components/charts/PopulationSplitBar";
 import PopulationAgePyramid from "@/components/charts/PopulationAgePyramid";
 import PopulationRanking from "@/components/charts/PopulationRanking";
+import PopulationTrendChart from "@/components/charts/PopulationTrendChart";
 import SelectDepartment from "@/components/SelectDepartement";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Loader } from "@/components/ui/loader";
@@ -137,6 +138,11 @@ export default function Home() {
         {/* Classement des départements */}
         <div className="border-t border-border py-7">
           <PopulationRanking />
+        </div>
+
+        {/* Évolution 1975-2023 */}
+        <div className="border-t border-border py-7">
+          <PopulationTrendChart department={displayedDep} />
         </div>
       </div>
 
