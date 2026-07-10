@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { PopulationDepartement } from "@/types/population";
 import { gsap } from "@/lib/gsap";
+import FigureHeader, { FigureLegendDot } from "./FigureHeader";
 
 type Props = {
   department: PopulationDepartement | null;
@@ -26,24 +27,12 @@ function formatValue(val: number) {
 }
 
 export const legendData = [
-  {
-    label: "Hommes",
-    baseColor1: "#3b82f6",
-    baseColor2: "#1e40af",
-    gradientId: "hommes-gradient",
-  },
-  {
-    label: "Femmes",
-    baseColor1: "#f472b6",
-    baseColor2: "#be185d",
-    gradientId: "femmes-gradient",
-  },
+  { label: "Hommes", color: "var(--hommes)" },
+  { label: "Femmes", color: "var(--femmes)" },
 ];
 
-// Utilitaire pour récupérer le fill url
 function getColor(label: string) {
-  const item = legendData.find((l) => l.label === label);
-  return item ? `url(#${item.gradientId})` : "#888";
+  return legendData.find((l) => l.label === label)?.color ?? "#888";
 }
 
 export default function PopulationAgePyramid({ department }: Props) {
@@ -72,41 +61,11 @@ export default function PopulationAgePyramid({ department }: Props) {
     const innerHeight = height - margin.top - margin.bottom;
 
     const svg = d3.select(ref.current);
-    
+
     // Configuration du viewBox et des dimensions directement avec D3
     svg
       .attr("viewBox", `0 0 ${width} ${height}`)
       .attr("preserveAspectRatio", "xMidYMid meet");
-    
-    // Initialisation des defs une seule fois
-    let defs = svg.select<SVGDefsElement>("defs");
-    if (defs.empty()) {
-      defs = svg.append<SVGDefsElement>("defs");
-      
-      // Génère les gradients une seule fois
-      legendData.forEach(({ gradientId, baseColor1, baseColor2 }) => {
-        const grad = defs
-          .append<SVGLinearGradientElement>("linearGradient")
-          .attr("id", gradientId)
-          .attr("x1", "0%")
-          .attr("y1", "0%")
-          .attr("x2", "100%")
-          .attr("y2", "0%");
-        
-        grad.append("stop")
-          .attr("offset", "0%")
-          .attr("stop-color", baseColor1)
-          .attr("stop-opacity", 0.8);
-        grad.append("stop")
-          .attr("offset", "50%")
-          .attr("stop-color", baseColor2)
-          .attr("stop-opacity", 0.9);
-        grad.append("stop")
-          .attr("offset", "100%")
-          .attr("stop-color", baseColor1)
-          .attr("stop-opacity", 1);
-      });
-    }
 
     // --- CONFIGURATION DES ÉCHELLES OPTIMISÉES ---
     const maxValue = d3.max(data, (d) => Math.max(Math.abs(d.hommes), d.femmes)) || 0;
@@ -340,7 +299,7 @@ export default function PopulationAgePyramid({ department }: Props) {
       .attr("dominant-baseline", "middle")
       .attr("font-size", 9)
       .attr("font-weight", "500")
-      .attr("fill", "#93c5fd")
+      .attr("fill", "var(--hommes)")
       .style("opacity", 0)
       .text((d) => formatValue(Math.abs(d.hommes)));
 
@@ -400,7 +359,7 @@ export default function PopulationAgePyramid({ department }: Props) {
       .attr("dominant-baseline", "middle")
       .attr("font-size", 9)
       .attr("font-weight", "500")
-      .attr("fill", "#f9a8d4")
+      .attr("fill", "var(--femmes)")
       .style("opacity", 0)
       .text((d) => formatValue(d.femmes));
 
@@ -467,19 +426,19 @@ export default function PopulationAgePyramid({ department }: Props) {
     // Style de l'axe X (conservé)
     xAxis
       .selectAll("path.domain")
-      .attr("stroke", "#64748b")
+      .attr("stroke", "var(--muted-foreground)")
       .attr("stroke-width", 2)
-      .attr("opacity", 0.7);
-
-    xAxis
-      .selectAll("g.tick line")
-      .attr("stroke", "#64748b")
-      .attr("stroke-width", 1)
       .attr("opacity", 0.5);
 
     xAxis
+      .selectAll("g.tick line")
+      .attr("stroke", "var(--muted-foreground)")
+      .attr("stroke-width", 1)
+      .attr("opacity", 0.4);
+
+    xAxis
       .selectAll("g.tick text")
-      .attr("fill", "#cbd5e1")
+      .attr("fill", "var(--muted-foreground)")
       .attr("font-size", 10)
       .attr("font-weight", "500");
 
@@ -489,9 +448,9 @@ export default function PopulationAgePyramid({ department }: Props) {
       centerLine = svg
         .append("line")
         .attr("class", "center-line")
-        .attr("stroke", "#475569")
+        .attr("stroke", "var(--muted-foreground)")
         .attr("stroke-width", 2)
-        .attr("opacity", 0.6)
+        .attr("opacity", 0.4)
         .style("stroke-dasharray", "5,5");
     }
     
@@ -552,50 +511,15 @@ export default function PopulationAgePyramid({ department }: Props) {
   if (!department) return null;
 
   return (
-    <div className="bg-gradient-to-br from-gray-900/40 to-gray-900/20 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-2xl shadow-gray-900/50 w-full h-full transition-all duration-300 hover:shadow-3xl hover:border-gray-600/50">
-      {/* Header avec titre et légende */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-1 h-8 bg-gradient-to-b from-blue-400 to-pink-400 rounded-full"></div>
-          <h3 className="text-xl font-bold text-gray-100 tracking-tight">
-            Pyramide des âges
-          </h3>
-        </div>
-        
-        {/* Légende améliorée */}
-        <div className="flex items-center gap-6">
-          {legendData.map((item) => (
-            <div key={item.label} className="flex items-center gap-3 group">
-              <div className="relative">
-                <div className="w-4 h-4 rounded-full shadow-lg" style={{ 
-                  background: `linear-gradient(135deg, ${item.baseColor1}, ${item.baseColor2})` 
-                }}></div>
-                <div className="absolute inset-0 w-4 h-4 rounded-full opacity-0 group-hover:opacity-30 transition-opacity duration-200" style={{ 
-                  background: `linear-gradient(135deg, ${item.baseColor1}, ${item.baseColor2})`,
-                  filter: 'blur(4px)',
-                  transform: 'scale(1.5)'
-                }}></div>
-              </div>
-              <span className="text-sm text-gray-300 font-medium group-hover:text-gray-200 transition-colors duration-200">
-                {item.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Conteneur du graphique avec bordure subtile */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-transparent to-pink-500/10 rounded-lg"></div>
-        <div className="relative bg-gray-900/30 rounded-lg p-4 border border-gray-800/40">
-          <div className="flex justify-center">
-            <svg 
-              ref={ref} 
-              className="w-full h-auto max-w-full max-h-full drop-shadow-lg"
-            />
-          </div>
-        </div>
-      </div>
+    <div className="w-full h-full">
+      <FigureHeader
+        n={3}
+        title="Pyramide des âges"
+        right={legendData.map((item) => (
+          <FigureLegendDot key={item.label} color={item.color} label={item.label} />
+        ))}
+      />
+      <svg ref={ref} className="w-full h-auto max-w-full max-h-full" />
     </div>
   );
 }

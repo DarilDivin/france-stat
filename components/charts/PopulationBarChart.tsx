@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
 import { gsap } from "@/lib/gsap";
 import { PopulationDepartement } from "@/types/population";
+import FigureHeader, { FigureLegendDot } from "./FigureHeader";
 
 type Props = {
   department: PopulationDepartement | null;
@@ -41,10 +42,13 @@ const AGE_LABELS = [
   { key: "75_plus", label: "75+" },
 ] as const;
 
+// Hex requis ici (et non var(--hommes) etc.) : d3.color(...).brighter/darker
+// ne sait pas résoudre une custom property CSS, seulement une vraie couleur.
+// Ces valeurs doivent rester synchronisées avec les tokens de app/globals.css.
 const GROUPS = [
-  { key: "ensemble", label: "Ensemble", color: "#2563eb" }, // Bleu foncé
-  { key: "hommes", label: "Hommes", color: "#60a5fa" }, // Bleu moyen
-  { key: "femmes", label: "Femmes", color: "#93c5fd" }, // Bleu clair
+  { key: "ensemble", label: "Ensemble", color: "#6b6558" },
+  { key: "hommes", label: "Hommes", color: "#2f6fa8" },
+  { key: "femmes", label: "Femmes", color: "#c2664a" },
 ] as const;
 
 export default function PopulationBarChart({ department }: Props) {
@@ -357,54 +361,15 @@ export default function PopulationBarChart({ department }: Props) {
   if (!department) return null;
 
   return (
-    <div className="bg-gradient-to-br from-gray-900/40 to-gray-900/20 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-2xl shadow-gray-900/50 w-full h-full transition-all duration-300 hover:shadow-3xl hover:border-gray-600/50">
-      {/* Header avec titre et légende */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-1 h-8 bg-gradient-to-b from-green-400 to-blue-400 rounded-full"></div>
-          <h3 className="text-lg font-semibold text-gray-100 tracking-tight">
-            Répartition par tranche d'âge
-          </h3>
-        </div>
-        
-        {/* Légende améliorée */}
-        <div className="flex items-center gap-6">
-          {GROUPS.map((group) => (
-            <div key={group.label} className="flex items-center gap-3 group">
-              <div className="relative">
-                <div 
-                  className="w-4 h-4 rounded-sm shadow-lg" 
-                  style={{ backgroundColor: group.color }}
-                ></div>
-                <div 
-                  className="absolute inset-0 w-4 h-4 rounded-sm opacity-0 group-hover:opacity-30 transition-opacity duration-200" 
-                  style={{ 
-                    backgroundColor: group.color,
-                    filter: 'blur(4px)',
-                    transform: 'scale(1.5)'
-                  }}
-                ></div>
-              </div>
-              <span className="text-sm text-gray-300 font-medium group-hover:text-gray-200 transition-colors duration-200">
-                {group.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Conteneur du graphique avec bordure subtile */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 via-transparent to-blue-500/10 rounded-lg"></div>
-        <div className="relative bg-gray-900/30 rounded-lg p-4 border border-gray-800/40">
-          <div className="flex justify-center">
-            <svg 
-              ref={ref} 
-              className="w-full h-auto max-w-full max-h-full drop-shadow-lg"
-            />
-          </div>
-        </div>
-      </div>
+    <div className="w-full h-full">
+      <FigureHeader
+        n={2}
+        title="Répartition par tranche d'âge"
+        right={GROUPS.map((group) => (
+          <FigureLegendDot key={group.label} color={group.color} label={group.label} />
+        ))}
+      />
+      <svg ref={ref} className="w-full h-auto max-w-full max-h-full" />
     </div>
   );
 }

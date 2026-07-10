@@ -4,6 +4,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-hommes: var(--hommes);
+  --color-femmes: var(--femmes);
+  --color-ensemble: var(--ensemble);
+  --color-brand: var(--brand);
+  --font-display: ui-serif, Georgia, "Iowan Old Style", "Noto Serif", "Times New Roman", serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -76,6 +81,11 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --hommes: #0857a0;
+  --femmes: #954530;
+  --ensemble: #8a8371;
+  --brand: #a8720a;
 }
 
 .dark {
@@ -110,6 +120,11 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --hommes: #2f6fa8;
+  --femmes: #c2664a;
+  --ensemble: #6b6558;
+  --brand: #c98500;
 }
 
 @layer base {

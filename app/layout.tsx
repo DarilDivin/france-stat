@@ -50,12 +50,12 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased flex justify-center bg-gray-950`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex justify-center bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
-          // enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <PopulationContextProvider>
