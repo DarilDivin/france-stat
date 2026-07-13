@@ -2,9 +2,9 @@ import fs from "fs";
 import path from "path";
 import * as XLSX from "xlsx";
 
-const XLS_PATH = path.join(__dirname, "../public/data/estim-pop-dep-sexe-gca-1975-2023.xls");
+const XLS_PATH = path.join(__dirname, "../public/data/estim-pop-dep-sexe-gca-1975-2026.xlsx");
 const OUTPUT_PATH = path.join(__dirname, "../public/data/population-history.json");
-const POPULATION_2023_PATH = path.join(__dirname, "../public/data/population.json");
+const POPULATION_LATEST_PATH = path.join(__dirname, "../public/data/population.json");
 
 // Colonnes (0-indexées) : 0=code, 1=nom, 2-7=Ensemble(0-19..75+,Total), 8-13=Hommes, 14-19=Femmes.
 const COL = { code: 0, nom: 1, ensembleTotal: 7, hommesTotal: 13, femmesTotal: 19 };
@@ -112,20 +112,21 @@ function main() {
     if (unexpected.length) errors.push(`${year} : départements inattendus — ${unexpected.join(", ")}`);
   }
 
-  // Validation croisée : le pipeline 2023 existant (population.json, extrait du CSV)
-  // et celui-ci (xls) partent de la même donnée source par des chemins différents.
-  if (fs.existsSync(POPULATION_2023_PATH)) {
-    const population2023 = JSON.parse(fs.readFileSync(POPULATION_2023_PATH, "utf8")) as {
+  // Validation croisée : population.json (millésime le plus récent, régénéré par convert.ts)
+  // et cette série historique (xls) partent de la même donnée source par des chemins différents.
+  if (fs.existsSync(POPULATION_LATEST_PATH)) {
+    const populationLatest = JSON.parse(fs.readFileSync(POPULATION_LATEST_PATH, "utf8")) as {
       id: string;
       ensemble: { total: number | null };
     }[];
-    const byId = new Map(population2023.map((d) => [d.id, d.ensemble.total]));
+    const latestYear = Math.max(...yearSheets.map(Number));
+    const byId = new Map(populationLatest.map((d) => [d.id, d.ensemble.total]));
     for (const entry of entries.values()) {
-      const expected2023 = byId.get(entry.id);
-      const actual2023 = entry.series["2023"];
-      if (expected2023 != null && actual2023 != null && expected2023 !== actual2023) {
+      const expectedLatest = byId.get(entry.id);
+      const actualLatest = entry.series[String(latestYear)];
+      if (expectedLatest != null && actualLatest != null && expectedLatest !== actualLatest) {
         errors.push(
-          `Incohérence avec population.json pour ${entry.id} (${entry.nom}) en 2023 : ${actual2023} ≠ ${expected2023}`
+          `Incohérence avec population.json pour ${entry.id} (${entry.nom}) en ${latestYear} : ${actualLatest} ≠ ${expectedLatest}`
         );
       }
     }

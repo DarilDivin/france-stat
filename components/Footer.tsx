@@ -17,7 +17,7 @@ const Footer: React.FC = () => {
           >
             INSEE
           </a>{' '}
-          2023 · Créé par{' '}
+          2026 · Créé par{' '}
           <a
             href="https://daril.fr"
             target="_blank"

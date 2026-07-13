@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import FranceMapDepartement from "@/components/maps/FranceMapDepartement";
 import { usePopulation } from "@/hooks/usePopulationData";
 import PopulationBarChart from "@/components/charts/PopulationBarChart";
@@ -13,7 +13,7 @@ import SelectDepartment from "@/components/SelectDepartement";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Loader } from "@/components/ui/loader";
 import Footer from "@/components/Footer";
-import { gsap } from "@/lib/gsap";
+import OdometerNumber from "@/components/OdometerNumber";
 
 export default function Home() {
   const [geoData, setGeoData] = useState<any>(null);
@@ -21,23 +21,6 @@ export default function Home() {
   const { data, selectedDep, setSelectedDep } = usePopulation();
 
   const displayedDep = selectedDep ?? aggregateFrance(data ?? []);
-
-  const numberRef = useRef<HTMLParagraphElement>(null);
-
-  useEffect(() => {
-    if (numberRef.current && displayedDep.ensemble.total != null) {
-      gsap.to(numberRef.current, {
-        scrambleText: {
-          text: displayedDep.ensemble.total.toLocaleString(),
-          chars: "𓂀𓆣𓅓𓏏", // caractères hiéroglyphiques égyptiens  𓊹𓃭𓆑𓎛𓋴𓄿
-          revealDelay: 0.2,
-          speed: 0.5,
-        },
-        duration: 1,
-        ease: "power2.out",
-      });
-    }
-  }, [displayedDep.ensemble.total]);
 
   useEffect(() => {
     fetch("/data/france-departements-avec-outre-mer.geojson")
@@ -69,7 +52,7 @@ export default function Home() {
               <span style={{ color: "var(--brand)" }}>·</span>Stat
             </div>
             <div className="text-[12.5px] tracking-widest uppercase text-muted-foreground mt-1">
-              Recensement INSEE — millésime 2023
+              Recensement INSEE — millésime 2026
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -109,12 +92,16 @@ export default function Home() {
             <p className="text-[12.5px] tracking-widest uppercase text-muted-foreground mb-1.5">
               Population totale
             </p>
-            <p
-              ref={numberRef}
-              className="font-display text-[clamp(2.6rem,5.6vw,4.6rem)] leading-none mb-6"
-            >
-              {displayedDep.ensemble.total?.toLocaleString() ?? "?"}
-            </p>
+            {displayedDep.ensemble.total != null ? (
+              <OdometerNumber
+                value={displayedDep.ensemble.total}
+                className="font-display text-[clamp(2.6rem,5.6vw,4.6rem)] leading-none mb-6 block"
+              />
+            ) : (
+              <p className="font-display text-[clamp(2.6rem,5.6vw,4.6rem)] leading-none mb-6">
+                ?
+              </p>
+            )}
 
             <PopulationSplitBar department={displayedDep} />
 
@@ -140,7 +127,7 @@ export default function Home() {
           <PopulationRanking />
         </div>
 
-        {/* Évolution 1975-2023 */}
+        {/* Évolution 1975-2026 */}
         <div className="border-t border-border py-7">
           <PopulationTrendChart department={displayedDep} />
         </div>

@@ -216,7 +216,7 @@ export default function PopulationTrendChart({ department }: Props) {
 
   return (
     <div className="w-full h-full">
-      <FigureHeader n={5} title="Évolution de la population (1975-2023)" />
+      <FigureHeader n={5} title="Évolution de la population (1975-2026)" />
       {points.length > 0 ? (
         <svg ref={ref} className="w-full h-auto max-w-full" />
       ) : (

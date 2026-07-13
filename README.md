@@ -26,27 +26,31 @@ Toutes les données sont statiques, servies depuis `public/data/` — il n'y a a
 
 | Fichier | Rôle |
 |---|---|
-| `estim-pop-dep-sexe-gca-1975-2023.xls` | Téléchargement INSEE brut d'origine (série 1975-2023, population par département/sexe/âge). Conservé comme archive de référence — **non lu par le code**. |
-| `estim-pop-dep-2023.csv` | Extrait de l'année 2023 découpé depuis le fichier ci-dessus. C'est l'unique entrée du pipeline de conversion. |
-| `population.json` | Généré à partir du CSV par [`scripts/convert.ts`](scripts/convert.ts). C'est le seul fichier de données réellement consommé par l'application (`hooks/usePopulationData.tsx`). |
+| `estim-pop-dep-sexe-gca-1975-2026.xlsx` | Téléchargement INSEE brut d'origine (série 1975-2026, population par département/sexe/grande classe d'âge, une feuille par année). Source unique du pipeline. |
+| `population.json` | Millésime le plus récent (2026), généré à partir du xlsx par [`scripts/convert.ts`](scripts/convert.ts). Seul fichier de données consommé par l'application pour la vue courante (`hooks/usePopulationData.tsx`). |
+| `population-history.json` | Série complète 1975-2026 (population totale par département et par année), générée à partir du même xlsx par [`scripts/convert-history.ts`](scripts/convert-history.ts). Alimente le graphique d'évolution (`PopulationTrendChart`). |
 | `france-departements-avec-outre-mer.geojson` | Contours géographiques des 101 départements (métropole + DOM), utilisé par la carte. Indépendant du pipeline de population. |
 
-Source : [INSEE — Estimations de population par département, sexe et grande classe d'âge](https://www.insee.fr/fr/statistiques/1893198).
+Source : [INSEE — Estimation de la population au 1ᵉʳ janvier](https://www.insee.fr/fr/statistiques/8721456) (série par département, sexe et grande classe d'âge).
 
-### Régénérer `population.json`
+### Régénérer les données
 
-Si `estim-pop-dep-2023.csv` change (nouvelle année, correction), régénérer le JSON avec :
+Quand l'INSEE publie un nouveau millésime (nouvelle année, ou fichier corrigé), remplacer `estim-pop-dep-sexe-gca-1975-YYYY.xlsx` dans `public/data/`, mettre à jour le nom de fichier attendu par `XLS_PATH` dans `scripts/convert.ts` et `scripts/convert-history.ts`, puis régénérer :
 
 ```bash
-pnpm data:convert
+pnpm data:convert          # population.json — dernière année du classeur
+pnpm data:convert-history  # population-history.json — toutes les années du classeur
 ```
 
-Le script ([`scripts/convert.ts`](scripts/convert.ts)) parse le CSV, puis valide les données avant d'écrire le fichier :
-- vérifie que chaque département a un code et un nom ;
-- vérifie qu'il n'y a ni doublon, ni département manquant ou inattendu par rapport à la liste des codes INSEE connus ;
-- vérifie que `hommes + femmes = ensemble` pour chaque tranche d'âge et le total.
+`convert.ts` prend automatiquement la feuille de l'année la plus récente du classeur (pas besoin d'extraction manuelle). Les deux scripts valident les données avant d'écrire le fichier :
+- vérifient que chaque département a un code et un nom ;
+- vérifient qu'il n'y a ni doublon, ni département manquant ou inattendu par rapport à la liste des codes INSEE connus (la couverture DOM varie selon l'année) ;
+- vérifient que `hommes + femmes = ensemble` pour chaque tranche d'âge et le total ;
+- `convert-history.ts` vérifie en plus que sa dernière année coïncide avec `population.json`, puisque les deux fichiers dérivent de la même source par des chemins différents.
 
-En cas d'incohérence, le script affiche le détail des erreurs, s'arrête avec un code de sortie non nul, et **n'écrit pas** `population.json` — les données publiées restent donc toujours cohérentes.
+En cas d'incohérence, le script affiche le détail des erreurs, s'arrête avec un code de sortie non nul, et **n'écrit pas** le fichier de sortie — les données publiées restent donc toujours cohérentes.
+
+Penser aussi à mettre à jour les mentions du millésime codées en dur dans l'UI (`app/page.tsx`, `components/Footer.tsx`, `components/charts/PopulationTrendChart.tsx`).
 
 ## Learn More
 

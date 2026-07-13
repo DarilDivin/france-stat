@@ -1,11 +1,24 @@
 import fs from "fs";
 import path from "path";
-import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
-const CSV_PATH = path.join(__dirname, "../public/data/estim-pop-dep-2023.csv");
+const XLS_PATH = path.join(
+  __dirname,
+  "../public/data/estim-pop-dep-sexe-gca-1975-2026.xlsx"
+);
 const OUTPUT_PATH = path.join(__dirname, "../public/data/population.json");
 
 const AGE_BRACKETS = ["0_19", "20_39", "40_59", "60_74", "75_plus"] as const;
+const FIRST_DATA_ROW = 5;
+
+// Colonnes (0-indexées) : 0=code, 1=nom, 2-7=Ensemble(0-19..75+,Total), 8-13=Hommes, 14-19=Femmes.
+const COL = {
+  code: 0,
+  nom: 1,
+  ensemble: { "0_19": 2, "20_39": 3, "40_59": 4, "60_74": 5, "75_plus": 6, total: 7 },
+  hommes: { "0_19": 8, "20_39": 9, "40_59": 10, "60_74": 11, "75_plus": 12, total: 13 },
+  femmes: { "0_19": 14, "20_39": 15, "40_59": 16, "60_74": 17, "75_plus": 18, total: 19 },
+} as const;
 
 const EXPECTED_CODES = [
   ...Array.from({ length: 95 }, (_, i) => i + 1)
@@ -20,41 +33,42 @@ const EXPECTED_CODES = [
   "976",
 ].sort();
 
-function cleanNumber(x: string | number | null | undefined) {
-  if (x === null || x === undefined) return null;
-  const str = String(x).replace(/\s/g, "");
-  if (str === "" || str.toLowerCase() === "nan") return null;
-  return Number(str);
+function normalizeCode(raw: unknown): string {
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw === "number") return String(Math.trunc(raw));
+  const s = String(raw).trim();
+  // Les codes texte zéro-préfixés ("01") doivent rejoindre la même forme que le reste
+  // du pipeline ("1") ; "2A"/"2B" ne matchent pas et passent tels quels.
+  if (/^0\d+$/.test(s)) return String(parseInt(s, 10));
+  return s;
 }
 
-function buildStructuredRow(row: any) {
+function isDeptCode(code: string): boolean {
+  return /^\d+$/.test(code) || code === "2A" || code === "2B";
+}
+
+function cleanNumber(x: unknown): number | null {
+  if (x === null || x === undefined || x === "") return null;
+  const n = typeof x === "number" ? x : Number(String(x).replace(/\s/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildStructuredRow(row: unknown[]) {
+  const pick = (colMap: Record<string, number>) => ({
+    "0_19": cleanNumber(row[colMap["0_19"]]),
+    "20_39": cleanNumber(row[colMap["20_39"]]),
+    "40_59": cleanNumber(row[colMap["40_59"]]),
+    "60_74": cleanNumber(row[colMap["60_74"]]),
+    "75_plus": cleanNumber(row[colMap["75_plus"]]),
+    total: cleanNumber(row[colMap.total]),
+  });
+
   return {
-    id: row["Code"]?.trim(),
-    nom: row["Nom"]?.trim(),
-    ensemble: {
-      "0_19": cleanNumber(row["0-19"]),
-      "20_39": cleanNumber(row["20-39"]),
-      "40_59": cleanNumber(row["40-59"]),
-      "60_74": cleanNumber(row["60-74"]),
-      "75_plus": cleanNumber(row["75+"]),
-      total: cleanNumber(row["Total"]),
-    },
-    hommes: {
-      "0_19": cleanNumber(row["0-19_1"]),
-      "20_39": cleanNumber(row["20-39_1"]),
-      "40_59": cleanNumber(row["40-59_1"]),
-      "60_74": cleanNumber(row["60-74_1"]),
-      "75_plus": cleanNumber(row["75+_1"]),
-      total: cleanNumber(row["Total_1"]),
-    },
-    femmes: {
-      "0_19": cleanNumber(row["0-19_2"]),
-      "20_39": cleanNumber(row["20-39_2"]),
-      "40_59": cleanNumber(row["40-59_2"]),
-      "60_74": cleanNumber(row["60-74_2"]),
-      "75_plus": cleanNumber(row["75+_2"]),
-      total: cleanNumber(row["Total_2"]),
-    },
+    id: normalizeCode(row[COL.code]),
+    nom: String(row[COL.nom] ?? "").trim(),
+    ensemble: pick(COL.ensemble),
+    hommes: pick(COL.hommes),
+    femmes: pick(COL.femmes),
   };
 }
 
@@ -94,33 +108,25 @@ function validate(rows: ReturnType<typeof buildStructuredRow>[]): string[] {
 }
 
 function main() {
-  if (!fs.existsSync(CSV_PATH)) {
-    console.error(`❌ Fichier introuvable : ${CSV_PATH}`);
+  if (!fs.existsSync(XLS_PATH)) {
+    console.error(`❌ Fichier introuvable : ${XLS_PATH}`);
     process.exit(1);
   }
 
-  let csv = fs.readFileSync(CSV_PATH, "utf8");
-  // La première ligne du CSV INSEE regroupe les colonnes par sexe (Ensemble/Hommes/Femmes) ; PapaParse n'a besoin que de la deuxième.
-  const lines = csv.split("\n");
-  csv = lines.slice(1).join("\n");
-
-  const { data, errors: parseErrors } = Papa.parse(csv, {
-    delimiter: ";",
-    header: true,
-    skipEmptyLines: true,
-    dynamicTyping: false,
-  });
-
-  if (parseErrors.length) {
-    console.error("❌ Erreurs de parsing CSV :", parseErrors);
+  const workbook = XLSX.readFile(XLS_PATH);
+  const yearSheets = workbook.SheetNames.filter((name) => /^\d{4}$/.test(name));
+  if (yearSheets.length === 0) {
+    console.error("❌ Aucune feuille au format année (YYYY) trouvée dans le classeur.");
     process.exit(1);
   }
+  const latestYear = Math.max(...yearSheets.map(Number));
 
-  const result = (data as any[])
-    .filter((row) => {
-      const dept_id = String(row["Code"] ?? "").trim();
-      return /^\d+$/.test(dept_id) || ["2A", "2B", "971", "972", "973", "974", "976"].includes(dept_id);
-    })
+  const sheet = workbook.Sheets[String(latestYear)];
+  const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+
+  const result = rows
+    .slice(FIRST_DATA_ROW)
+    .filter((row) => row && row.length > 0 && isDeptCode(normalizeCode(row[COL.code])))
     .map(buildStructuredRow);
 
   const validationErrors = validate(result);
@@ -132,7 +138,9 @@ function main() {
   }
 
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(result, null, 2));
-  console.log(`✅ population.json créé ! (${result.length} départements, validation OK)`);
+  console.log(
+    `✅ population.json créé ! (millésime ${latestYear}, ${result.length} départements, validation OK)`
+  );
 }
 
 main();
